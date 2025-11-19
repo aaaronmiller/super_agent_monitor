@@ -1,0 +1,79 @@
+# Markdown Agent Auditor - Git Ignore File
+
+# Output directory (generated analysis results)
+output/
+*.log
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS files
+Thumbs.db
+desktop.ini
+
+# Claude Code cache (if any)
+.claude-cache/
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+
+# Temporary files
+*.tmp
+*.temp
+.temp/
+tmp/
+
+# User-specific target files (optional - remove if you want to track target files)
+# target/
+
+# Backup files
+*.bak
+*.backup
+
+# Environment variables
+.env
+.env.local
+
+# Node modules (if you add any JS tooling later)
+node_modules/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# macOS
+.AppleDouble
+.LSOverride
+
+# Windows
+ehthumbs.db
+ehthumbs_vista.db
+
+# Linux
+.directory
+.Trash-*

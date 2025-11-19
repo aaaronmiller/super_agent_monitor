@@ -1,0 +1,95 @@
+id: security-audit-v1
+name: Security Audit Workflow
+description: Comprehensive security audit workflow using Star pattern for parallel vulnerability assessment
+version: 1.0.0
+author: system
+tags: [security, audit, parallel, comprehensive]
+
+orchestration:
+  pattern: star
+  model: claude-sonnet-4
+  systemPrompt: orchestrators/star-coordinator.md
+  thinkingBudget: 8000
+  temperature: 0.1
+
+components:
+  agents:
+    - code-reviewer
+    - analyzer
+  skills:
+    - security-audit
+    - api-design
+    - db-optimization
+  hooks:
+    - cost-tracker
+    - format-enforcer
+    - progress-tracker
+  scripts:
+    - fetch-url.py
+    - scan-files.py
+
+memory:
+  enabled: true
+  persistence: session
+  rag: false
+
+lifecycle:
+  haltDetectionSeconds: 300
+  autoRestart: true
+  maxRetries: 3
+  kickPrompt: "Continue security audit. Review progress and proceed with next security domain."
+
+defaults:
+  maxTokensPerMessage: 6000
+  toolTimeout: 60
+
+notes: |
+  Security Audit workflow for comprehensive vulnerability assessment.
+
+  Audit domains (parallel):
+  1. Frontend Security
+     - XSS vulnerabilities
+     - CSRF protection
+     - Input validation
+     - Content Security Policy
+
+  2. Backend Security
+     - SQL injection
+     - Authentication flaws
+     - Authorization bypass
+     - API security
+
+  3. Infrastructure Security
+     - Secrets management
+     - Environment configs
+     - Dependency vulnerabilities
+     - Docker/deployment security
+
+  4. Data Security
+     - Encryption at rest
+     - Encryption in transit
+     - PII handling
+     - Access control
+
+  Pattern: Star (hub-and-spoke)
+  - Coordinator assigns security domains
+  - Agents audit in parallel
+  - Results aggregated by severity
+  - Comprehensive report generated
+
+  Output format:
+  - Critical vulnerabilities (CVSS 9.0-10.0)
+  - High severity (CVSS 7.0-8.9)
+  - Medium severity (CVSS 4.0-6.9)
+  - Low severity (CVSS 0.1-3.9)
+  - Remediation plan with priorities
+
+  Timeline:
+  - Small codebase (<10K LOC): 15-20 minutes
+  - Medium codebase (10-50K LOC): 30-45 minutes
+  - Large codebase (>50K LOC): 1-2 hours
+
+  Example usage:
+  "Perform comprehensive security audit of our web application.
+   Focus on OWASP Top 10 vulnerabilities.
+   Provide severity ratings and remediation steps."
