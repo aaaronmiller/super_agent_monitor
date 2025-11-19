@@ -37,6 +37,11 @@ const router = createRouter({
       path: '/sessions/:id',
       name: 'session-detail',
       component: () => import('../views/SessionDetail.vue')
+    },
+    {
+      path: '/memory',
+      name: 'memory',
+      component: () => import('../views/Memory.vue')
     }
   ]
 })

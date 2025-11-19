@@ -39,11 +39,18 @@
               >
                 Sessions
               </router-link>
+              <router-link
+                to="/memory"
+                class="nav-link"
+                active-class="nav-link-active"
+              >
+                Memory
+              </router-link>
             </nav>
           </div>
           
           <div class="flex items-center space-x-4">
-            <span class="text-sm text-gray-500">v0.1.0 (Phase 1)</span>
+            <span class="text-sm text-gray-500">v0.2.0 (Phase 2)</span>
           </div>
         </div>
       </div>
