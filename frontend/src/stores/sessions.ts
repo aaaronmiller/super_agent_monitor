@@ -105,6 +105,55 @@ export const useSessionsStore = defineStore('sessions', () => {
     }
   }
 
+  // Session Control Methods
+  async function startSession(id: string) {
+    try {
+      const { data } = await api.post(`/sessions/${id}/start`)
+      return data
+    } catch (err: any) {
+      error.value = err.response?.data?.error || 'Failed to start session'
+      throw err
+    }
+  }
+
+  async function stopSession(id: string) {
+    try {
+      const { data } = await api.post(`/sessions/${id}/stop`)
+      return data
+    } catch (err: any) {
+      error.value = err.response?.data?.error || 'Failed to stop session'
+      throw err
+    }
+  }
+
+  async function restartSession(id: string) {
+    try {
+      const { data } = await api.post(`/sessions/${id}/restart`)
+      return data
+    } catch (err: any) {
+      error.value = err.response?.data?.error || 'Failed to restart session'
+      throw err
+    }
+  }
+
+  async function getSessionStatus(id: string) {
+    try {
+      const { data } = await api.get(`/sessions/${id}/status`)
+      return data
+    } catch (err: any) {
+      throw err
+    }
+  }
+
+  async function getMonitorStats() {
+    try {
+      const { data } = await api.get('/sessions/monitor/stats')
+      return data
+    } catch (err: any) {
+      throw err
+    }
+  }
+
   return {
     sessions,
     loading,
@@ -115,6 +164,11 @@ export const useSessionsStore = defineStore('sessions', () => {
     getSessionEvents,
     createSession,
     updateSession,
-    deleteSession
+    deleteSession,
+    startSession,
+    stopSession,
+    restartSession,
+    getSessionStatus,
+    getMonitorStats
   }
 })
