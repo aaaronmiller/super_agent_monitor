@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts",
-    "db:migrate": "bun run src/db/migrate.ts",
+    "db:migrate": "bun run src/db/migrate.ts up",
+    "db:migrate:status": "bun run src/db/migrate.ts status",
+    "db:migrate:rollback": "bun run src/db/migrate.ts rollback",
     "db:seed": "bun run src/db/seed.ts",
     "test": "bun test"
   },
