@@ -7,6 +7,7 @@ import { componentsRouter } from './routes/components'
 import { workflowsRouter } from './routes/workflows'
 import { sessionsRouter } from './routes/sessions'
 import { sessionControlRouter } from './routes/session-control'
+import { memoryRouter } from './routes/memory'
 import { webSocketService } from './services/WebSocketService'
 import { sessionMonitor } from './services/SessionMonitor'
 import { sessionLauncher } from './services/SessionLauncher'
@@ -35,6 +36,7 @@ app.use('/api/components', componentsRouter)
 app.use('/api/workflows', workflowsRouter)
 app.use('/api/sessions', sessionsRouter)
 app.use('/api/sessions', sessionControlRouter)
+app.use('/api/memory', memoryRouter)
 
 // Error handling
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

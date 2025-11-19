@@ -3,6 +3,7 @@ import { EventEmitter } from 'events'
 import path from 'path'
 import { pool } from '../index'
 import { v4 as uuidv4 } from 'uuid'
+import { memoryIngestion } from './MemoryIngestion'
 
 export interface SessionConfig {
   workflowId: string
@@ -149,6 +150,13 @@ export class SessionLauncher extends EventEmitter {
     // Log raw output for debugging
     console.log(`[${sessionId}] Output: ${output.substring(0, 200)}...`)
 
+    // Update last activity
+    this.lastActivity.set(sessionId, new Date())
+
+    // Get workflow ID for memory ingestion
+    const config = this.sessionConfigs.get(sessionId)
+    if (!config) return
+
     // Parse for structured events (JSON lines)
     const lines = output.split('\n').filter(line => line.trim())
 
@@ -157,17 +165,52 @@ export class SessionLauncher extends EventEmitter {
         // Try to parse as JSON (Claude Code outputs events as JSON)
         if (line.startsWith('{')) {
           const event = JSON.parse(line)
+          const eventId = uuidv4()
+
           await this.logEvent(sessionId, {
             type: event.type || 'output',
             timestamp: new Date().toISOString(),
             data: event
           })
 
-          // Handle specific event types
-          if (event.type === 'tool_use') {
+          // Ingest into memory system for significant events
+          if (event.type === 'tool_use' && event.output) {
+            // Queue tool outputs for memory (batched)
+            memoryIngestion.queueForBatch({
+              sessionId,
+              workflowId: config.workflowId,
+              content: JSON.stringify({
+                tool: event.tool,
+                input: event.input,
+                output: event.output
+              }),
+              contentType: 'tool_output',
+              metadata: {
+                tool: event.tool,
+                duration: event.duration
+              },
+              eventId,
+              toolName: event.tool
+            })
+
             this.emit('session:tool_use', { sessionId, tool: event.tool })
           } else if (event.type === 'api_response') {
             await this.updateTokenUsage(sessionId, event.usage)
+
+            // Ingest completion messages
+            if (event.content) {
+              memoryIngestion.queueForBatch({
+                sessionId,
+                workflowId: config.workflowId,
+                content: event.content,
+                contentType: 'completion',
+                metadata: {
+                  model: event.model,
+                  tokens: event.usage
+                },
+                eventId
+              })
+            }
           }
         }
       } catch (error) {
@@ -185,11 +228,29 @@ export class SessionLauncher extends EventEmitter {
    * Handle stderr errors
    */
   private async handleError(sessionId: string, error: string) {
+    const eventId = uuidv4()
+
     await this.logEvent(sessionId, {
       type: 'error',
       timestamp: new Date().toISOString(),
       data: { error }
     })
+
+    // Ingest errors into memory (high importance)
+    const config = this.sessionConfigs.get(sessionId)
+    if (config && error.trim().length > 0) {
+      memoryIngestion.queueForBatch({
+        sessionId,
+        workflowId: config.workflowId,
+        content: error,
+        contentType: 'error',
+        metadata: {
+          severity: 'error'
+        },
+        eventId,
+        importanceScore: 0.8 // Errors are important to remember
+      })
+    }
 
     this.emit('session:error', { sessionId, error })
   }
