@@ -2,9 +2,14 @@ import express from 'express'
 import cors from 'cors'
 import { Pool } from 'pg'
 import dotenv from 'dotenv'
+import { createServer } from 'http'
 import { componentsRouter } from './routes/components'
 import { workflowsRouter } from './routes/workflows'
 import { sessionsRouter } from './routes/sessions'
+import { sessionControlRouter } from './routes/session-control'
+import { webSocketService } from './services/WebSocketService'
+import { sessionMonitor } from './services/SessionMonitor'
+import { sessionLauncher } from './services/SessionLauncher'
 
 dotenv.config()
 
@@ -29,6 +34,7 @@ app.get('/health', (req, res) => {
 app.use('/api/components', componentsRouter)
 app.use('/api/workflows', workflowsRouter)
 app.use('/api/sessions', sessionsRouter)
+app.use('/api/sessions', sessionControlRouter)
 
 // Error handling
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -64,13 +70,66 @@ async function start() {
     await componentRegistry.scan()
     console.log('✅ Component registry initialized')
 
-    app.listen(PORT, () => {
+    // Create HTTP server
+    const server = createServer(app)
+
+    // Initialize WebSocket server
+    webSocketService.initialize(server)
+    console.log('✅ WebSocket service initialized')
+
+    // Start session monitor
+    sessionMonitor.start()
+    console.log('✅ Session monitor started')
+
+    // Start HTTP server
+    server.listen(PORT, () => {
       console.log(`✅ Server running on http://localhost:${PORT}`)
       console.log(`📚 API: http://localhost:${PORT}/api`)
       console.log(`🏥 Health: http://localhost:${PORT}/health`)
+      console.log(`🔌 WebSocket: ws://localhost:${PORT}/ws`)
       console.log('')
-      console.log('🎯 Ready to serve workflows and components')
+      console.log('🎯 Ready to serve workflows and manage sessions')
     })
+
+    // Graceful shutdown
+    const shutdown = async () => {
+      console.log('\n🛑 Shutting down gracefully...')
+
+      // Stop accepting new connections
+      server.close(() => {
+        console.log('✅ HTTP server closed')
+      })
+
+      // Stop session monitor
+      sessionMonitor.stop()
+      console.log('✅ Session monitor stopped')
+
+      // Stop all active sessions
+      const activeSessions = sessionLauncher.getActiveSessions()
+      console.log(`🛑 Stopping ${activeSessions.length} active sessions...`)
+      for (const sessionId of activeSessions) {
+        try {
+          await sessionLauncher.stop(sessionId)
+        } catch (error) {
+          console.error(`Error stopping session ${sessionId}:`, error)
+        }
+      }
+
+      // Shutdown WebSocket server
+      webSocketService.shutdown()
+      console.log('✅ WebSocket service shut down')
+
+      // Close database pool
+      await pool.end()
+      console.log('✅ Database pool closed')
+
+      console.log('👋 Shutdown complete')
+      process.exit(0)
+    }
+
+    process.on('SIGTERM', shutdown)
+    process.on('SIGINT', shutdown)
+
   } catch (error) {
     console.error('❌ Failed to start server:', error)
     process.exit(1)
