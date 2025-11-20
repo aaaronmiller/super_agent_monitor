@@ -1,0 +1,37 @@
+id: deep-research-v1
+name: Deep Research Workflow
+description: Multi-agent research workflow with web scraping and synthesis
+version: 1.0.0
+author: system
+tags: [research, autonomous, web-scraping, synthesis]
+
+orchestration:
+  pattern: ceo-worker
+  model: claude-sonnet-4
+  systemPrompt: orchestrators/research-coordinator.md
+  thinkingBudget: 10000
+  temperature: 0.7
+
+components:
+  agents:
+    - researcher-primary
+    - web-scraper
+    - analyzer
+  skills:
+    - web-search-advanced
+  hooks:
+    - cost-tracker
+  scripts:
+    - fetch-url.py
+
+memory:
+  enabled: true
+  persistence: session
+  rag: true
+  retrievalK: 5
+
+lifecycle:
+  haltDetectionSeconds: 300
+  autoRestart: true
+  maxRetries: 3
+  kickPrompt: "Continue with your research task. Review progress and proceed with next logical step."

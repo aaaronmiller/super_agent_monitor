@@ -1,0 +1,73 @@
+Super Agent Monitor
+Copyright (c) 2025 Super Agent Monitor Contributors
+
+This software contains components derived from or inspired by the following projects:
+
+================================================================================
+
+PROJECT: multi-agent-workflow
+REPOSITORY: [To be specified when submodule added]
+LICENSE STATUS: Unlicensed (as of 2025-01-19)
+USAGE: Reference implementation for monitoring dashboard and workflow patterns
+
+NOTE: The multi-agent-workflow project does not currently include a license file.
+According to copyright law, this means all rights are reserved by the original
+authors. We have incorporated architectural patterns and concepts from this
+project with the understanding that:
+
+1. This is intended as a reference implementation for educational purposes
+2. We will seek explicit permission from the authors if required
+3. We are prepared to rewrite any components if licensing issues arise
+4. We acknowledge the original authors' contributions
+
+If you are the author of multi-agent-workflow and have concerns about this
+usage, please contact us immediately.
+
+================================================================================
+
+PROJECT: claude-code-proxy
+REPOSITORY: [To be specified when submodule added]
+LICENSE STATUS: Unlicensed (as of 2025-01-19)
+USAGE: API interception layer for model routing and cost tracking
+
+NOTE: The claude-code-proxy project does not currently include a license file.
+According to copyright law, this means all rights are reserved by the original
+authors. We have incorporated architectural patterns and API integration
+concepts from this project with the understanding that:
+
+1. This is intended as a reference implementation for educational purposes
+2. We will seek explicit permission from the authors if required
+3. We are prepared to rewrite any components if licensing issues arise
+4. We acknowledge the original authors' contributions
+
+If you are the author of claude-code-proxy and have concerns about this usage,
+please contact us immediately.
+
+================================================================================
+
+LEGAL DISCLAIMER
+
+This software relies on reference implementations from unlicensed open-source
+projects. While we believe our usage is fair and transformative, users of this
+software should be aware that:
+
+1. The legal status of using unlicensed code is uncertain
+2. Original authors retain full copyright over their works
+3. We may need to remove or rewrite components if licensing disputes arise
+4. Users assume their own risk when using this software
+
+We are committed to:
+- Respecting the intellectual property of others
+- Seeking proper permissions when possible
+- Rewriting code if necessary to resolve licensing issues
+- Providing attribution to all original authors
+
+For questions or concerns, please open an issue in our repository.
+
+================================================================================
+
+THIRD-PARTY DEPENDENCIES
+
+This software also uses standard open-source dependencies (PostgreSQL, Vue.js,
+etc.) which are licensed under their respective licenses. See package.json
+files for complete dependency lists.

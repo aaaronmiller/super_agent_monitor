@@ -1,0 +1,74 @@
+id: fast-coder-v1
+name: Fast Coder Workflow
+description: High-speed code generation workflow using Star pattern for parallel feature implementation
+version: 1.0.0
+author: system
+tags: [coding, parallel, fast, star-pattern]
+
+orchestration:
+  pattern: star
+  model: claude-sonnet-4
+  systemPrompt: orchestrators/star-coordinator.md
+  thinkingBudget: 5000
+  temperature: 0.3
+
+components:
+  agents:
+    - code-reviewer
+    - tester
+  skills:
+    - api-design
+    - testing-patterns
+  hooks:
+    - cost-tracker
+    - format-enforcer
+  scripts: []
+
+memory:
+  enabled: true
+  persistence: session
+  rag: false
+
+lifecycle:
+  haltDetectionSeconds: 180
+  autoRestart: true
+  maxRetries: 2
+  kickPrompt: "Continue with code implementation. Check your progress and implement the next feature."
+
+defaults:
+  maxTokensPerMessage: 4000
+  toolTimeout: 30
+
+notes: |
+  Fast Coder workflow optimized for parallel feature implementation.
+
+  Use cases:
+  - Implementing multiple independent features simultaneously
+  - Rapid prototyping
+  - Batch code generation
+
+  Pattern: Star (hub-and-spoke)
+  - Central coordinator broadcasts coding tasks
+  - Multiple agents code in parallel
+  - Results aggregated for review
+
+  Workflow:
+  1. Coordinator decomposes feature request into independent tasks
+  2. Broadcasts tasks to available coding agents
+  3. Agents implement features in parallel
+  4. Code reviewer checks all implementations
+  5. Tester validates functionality
+  6. Results synthesized and presented
+
+  Performance:
+  - 3-5x faster than sequential coding
+  - Best for 3-10 independent features
+  - Each feature should take 5-15 minutes
+
+  Example usage:
+  "Implement these features:
+   1. User authentication API
+   2. Email validation
+   3. Password reset flow
+   4. Session management
+   5. Rate limiting"

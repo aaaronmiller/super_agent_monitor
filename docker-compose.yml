@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  # PostgreSQL with pgvector extension
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: super_agent_monitor_db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-super_agent_monitor}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - super_agent_network
+    restart: unless-stopped
+
+  # Backend API server
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: super_agent_monitor_backend
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-super_agent_monitor}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      PORT: 3001
+      NODE_ENV: ${NODE_ENV:-production}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+      STALL_DETECTION_SECONDS: ${STALL_DETECTION_SECONDS:-300}
+      MONITOR_CHECK_INTERVAL_SECONDS: ${MONITOR_CHECK_INTERVAL_SECONDS:-60}
+      MAX_SESSION_RETRIES: ${MAX_SESSION_RETRIES:-3}
+      WS_PATH: ${WS_PATH:-/ws}
+    ports:
+      - "${BACKEND_PORT:-3001}:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - claude_workflows:/app/.workflows
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - super_agent_network
+    restart: unless-stopped
+    command: bun run start
+
+  # Frontend application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: super_agent_monitor_frontend
+    environment:
+      VITE_API_BASE_URL: http://localhost:${BACKEND_PORT:-3001}
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      - backend
+    networks:
+      - super_agent_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  claude_workflows:
+    driver: local
+
+networks:
+  super_agent_network:
+    driver: bridge

@@ -1,0 +1,33 @@
+{
+  "model": "claude-sonnet-4-5-20250929",
+  "temperature": 0.7,
+  "thinkingBudget": 10000,
+  "systemPrompt": "You are the Markdown Agent Auditor Orchestrator. Follow the instructions in CLAUDE.md precisely.",
+  "tools": [
+    "Task",
+    "Read",
+    "Write",
+    "Edit",
+    "Bash",
+    "Glob",
+    "Grep",
+    "TodoWrite",
+    "WebSearch",
+    "WebFetch"
+  ],
+  "projectConfig": {
+    "targetDirectory": "target/",
+    "outputDirectory": "output/",
+    "enableProgressTracking": true,
+    "maxConcurrentAgents": 5,
+    "retryFailedFiles": true,
+    "maxRetries": 1
+  },
+  "ratingCriteria": {
+    "completeness": "All required sections present and filled out",
+    "clarity": "Requirements are unambiguous and specific",
+    "technical": "Sufficient technical detail for implementation",
+    "userFocus": "Clear value propositions and user benefits",
+    "feasibility": "Realistic scope and achievable within constraints"
+  }
+}
