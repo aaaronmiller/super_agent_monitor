@@ -46,6 +46,13 @@
               >
                 Memory
               </router-link>
+              <router-link
+                to="/analytics"
+                class="nav-link"
+                active-class="nav-link-active"
+              >
+                Analytics
+              </router-link>
             </nav>
           </div>
           

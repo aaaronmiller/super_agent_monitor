@@ -42,6 +42,11 @@ const router = createRouter({
       path: '/memory',
       name: 'memory',
       component: () => import('../views/Memory.vue')
+    },
+    {
+      path: '/analytics',
+      name: 'analytics',
+      component: () => import('../views/Analytics.vue')
     }
   ]
 })
