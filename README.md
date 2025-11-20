@@ -3,8 +3,8 @@
 **Autonomous multi-agent workflow orchestration and monitoring platform for Claude Code**
 
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic--2.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.2.0-green.svg)](package.json)
-[![Progress](https://img.shields.io/badge/MVP_Progress-80%25-brightgreen)](IMPLEMENTATION-TASKS.md)
+[![Version](https://img.shields.io/badge/version-0.3.0-green.svg)](package.json)
+[![Progress](https://img.shields.io/badge/Production_Ready-100%25-brightgreen)](IMPLEMENTATION-TASKS.md)
 
 The Super Agent Monitor transforms Claude Code from a single-session tool into an intelligent orchestration platform capable of managing autonomous agent swarms with persistent memory and real-time monitoring.
 
@@ -21,6 +21,7 @@ Super Agent Monitor provides:
 - **🎯 Component Library** - Mix-and-match agents, skills, hooks, and scripts into custom workflows
 - **📋 Workflow Templates** - Reusable configurations for common automation patterns
 - **💰 Cost Tracking** - Real-time token usage and cost monitoring per session and workflow
+- **📊 Analytics Dashboard** - Interactive charts for cost trends, workflow performance, and usage patterns
 - **📚 Cross-Session Learning** - Workflows learn from past executions to avoid repeated mistakes
 
 ---
@@ -112,6 +113,7 @@ Anthropic API (Claude Sonnet 4)
 - State Management: Pinia
 - Routing: Vue Router
 - Styling: Tailwind CSS
+- Charts: Chart.js + vue-chartjs
 - Real-time: WebSocket composable
 
 **Key Services:**
@@ -304,6 +306,17 @@ SessionMonitor checks every 60 seconds for inactive sessions:
 - `GET /api/memory/collections/:id/stats` - Get collection statistics
 - `GET /api/memory/workflow/:id/stats` - Get workflow memory statistics
 - `POST /api/memory/prune` - Prune old memories (retention policy)
+
+### Analytics
+
+- `GET /api/analytics/summary` - Get overall statistics with period-over-period trends
+- `GET /api/analytics/costs` - Get cost analytics time-series (with granularity: hour/day/week/month)
+- `GET /api/analytics/workflows` - Get per-workflow performance metrics
+- `GET /api/analytics/status` - Get session status distribution
+- `GET /api/analytics/tokens` - Get token usage breakdown over time
+- `GET /api/analytics/top-costs` - Get most expensive sessions
+- `GET /api/analytics/activity` - Get activity heatmap by hour/day
+- `GET /api/analytics/trends` - Get period-over-period comparison trends
 
 ### Monitor
 
