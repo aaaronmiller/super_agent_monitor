@@ -33,7 +33,12 @@ Super Agent Monitor provides:
 - **Node.js 18+** or **Bun 1.0+**
 - **PostgreSQL 14+** with **pgvector** extension
 - **OpenAI API key** (for RAG memory embeddings)
+- **Anthropic API key** (for agent observability and summarization)
+- **E2B API key** (optional, for sandbox execution)
 - **Claude Code CLI** installed and configured
+- **Astral uv** (for Python hook scripts in multi-agent-workflow)
+- **jq** (JSON processor for scripts)
+- **mpv** (optional, for TTS notifications)
 
 ### Installation
 
@@ -126,6 +131,104 @@ Anthropic API (Claude Sonnet 4)
 
 ---
 
+## 🔌 Integrated Components
+
+Super Agent Monitor integrates several powerful components for enhanced functionality:
+
+### Multi-Agent Workflow Observability
+
+**Location:** `multi-agent-workflow/`
+**Source:** [apolopena/multi-agent-workflow](https://github.com/apolopena/multi-agent-workflow)
+
+Provides comprehensive Claude Code observability with:
+- Real-time agent monitoring dashboard (Vue 3 + WebSocket)
+- Hook system for lifecycle events (pre_tool_use, post_tool_use, etc.)
+- AI-powered event summarization (real-time or on-demand)
+- TTS notifications for agent completion
+- Multi-agent session tracking and filtering
+- Git operations with AI attribution
+
+**Setup:**
+```bash
+cd multi-agent-workflow
+./scripts/observability-start.sh
+# Dashboard: http://localhost:5173
+# API: http://localhost:4000
+```
+
+**Integration:** See [docs/UPSTREAM_INTEGRATION.md](docs/UPSTREAM_INTEGRATION.md) for maintaining parity with upstream.
+
+### E2B Sandbox Execution
+
+**Location:** `agent-sandboxes/`
+**Source:** [dzhng/claude-agent-server](https://github.com/dzhng/claude-agent-server)
+
+Enables secure, isolated code execution in E2B sandboxes:
+- WebSocket-based agent communication
+- Session management for long-running agents
+- Real-time bidirectional streaming
+- GitHub repository integration
+- Isolated execution environments
+
+**Configuration:**
+- Requires `E2B_API_KEY` in `.env`
+- Supports deployment as E2B sandbox or locally
+- Enables spawning orchestration nodes inside sandboxes
+
+### Agent Sandbox Skill
+
+**Location:** `components/skills/agent-sandboxes/`
+**Source:** [disler/agent-sandbox-skill](https://github.com/disler/agent-sandbox-skill)
+
+Claude Code skill for deploying agents to E2B sandboxes:
+- Run Python code in isolated environments
+- Test packages before installation
+- Clone and test repositories
+- Process binary files safely
+- Host frontend applications
+
+**Usage:**
+```
+"Use the agent-sandbox skill to test this code in an isolated environment"
+```
+
+### Beyond-MCP: Script-Based Agent SDK
+
+**Location:** `beyond-mcp/`
+**Source:** [anthropics/claude-agent-sdk-python](https://github.com/anthropics/claude-agent-sdk-python)
+
+Direct Python SDK for Claude agents without MCP overhead:
+- In-process tool execution (no separate MCP servers)
+- Custom Python functions as tools
+- Reduced token usage vs MCP approach
+- Programmatic agent control for CI/CD
+- Batch processing and scripting
+
+**Benefits:**
+- **Performance**: No inter-process communication overhead
+- **Simplicity**: Tools are Python functions, not separate processes
+- **Cost**: Saves tokens by avoiding MCP protocol overhead
+- **Flexibility**: Full programmatic control over agent behavior
+
+**When to Use:**
+- Agents requiring frequent memory/context operations
+- High-throughput batch processing
+- CI/CD integration
+- Custom tooling without MCP server setup
+
+**Example:**
+```python
+from beyond_mcp import create_agent
+
+agent = create_agent(
+    model="claude-sonnet-4",
+    tools=[my_custom_tool]
+)
+result = agent.run("Analyze this codebase")
+```
+
+---
+
 ## 🎯 Component System
 
 Components are modular building blocks for workflows:
@@ -159,8 +262,9 @@ incompatible: []
 - researcher-primary, web-scraper, code-reviewer, tester, analyzer
 - prd-finder, file-analyzer, project-tagger, prd-rater, github-searcher
 
-**Skills (5):**
+**Skills (6):**
 - web-search-advanced, api-design, db-optimization, security-audit, testing-patterns
+- agent-sandboxes (E2B sandbox deployment and testing)
 
 **Hooks (5):**
 - cost-tracker.py, stall-detector.py, format-enforcer.sh, progress-tracker.py, session-start.py
