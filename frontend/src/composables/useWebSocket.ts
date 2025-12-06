@@ -1,132 +1,107 @@
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue';
+import type { HookEvent, WebSocketMessage } from '../types';
 
-export interface WSMessage {
-  type: string
-  data: any
-  timestamp: string
-}
+export function useWebSocket(url: string = 'ws://localhost:3001') {
+  const events = ref<HookEvent[]>([]);
+  const isConnected = ref(false);
+  const error = ref<string | null>(null);
 
-export interface UseWebSocketOptions {
-  url: string
-  reconnect?: boolean
-  reconnectInterval?: number
-  onMessage?: (message: WSMessage) => void
-  onError?: (error: Event) => void
-  onConnect?: () => void
-  onDisconnect?: () => void
-}
+  let ws: WebSocket | null = null;
+  let reconnectTimeout: number | null = null;
 
-export function useWebSocket(options: UseWebSocketOptions) {
-  const {
-    url,
-    reconnect = true,
-    reconnectInterval = 5000,
-    onMessage,
-    onError,
-    onConnect,
-    onDisconnect
-  } = options
-
-  const ws = ref<WebSocket | null>(null)
-  const isConnected = ref(false)
-  const lastMessage = ref<WSMessage | null>(null)
-  const reconnectTimer = ref<number | null>(null)
+  // Get max events from environment variable or use default
+  const maxEvents = parseInt(import.meta.env.VITE_MAX_EVENTS_TO_DISPLAY || '100');
 
   const connect = () => {
     try {
-      // Determine WebSocket URL
-      const wsUrl = url.startsWith('ws://') || url.startsWith('wss://')
-        ? url
-        : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}${url}`
+      ws = new WebSocket(url);
 
-      ws.value = new WebSocket(wsUrl)
+      ws.onopen = () => {
+        console.log('WebSocket connected');
+        isConnected.value = true;
+        error.value = null;
+      };
 
-      ws.value.onopen = () => {
-        console.log('WebSocket connected')
-        isConnected.value = true
-        onConnect?.()
-      }
-
-      ws.value.onmessage = (event) => {
+      ws.onmessage = (event) => {
         try {
-          const message: WSMessage = JSON.parse(event.data)
-          lastMessage.value = message
-          onMessage?.(message)
-        } catch (error) {
-          console.error('Failed to parse WebSocket message:', error)
+          const message: WebSocketMessage = JSON.parse(event.data);
+
+          if (message.type === 'initial') {
+            const initialEvents = Array.isArray(message.data) ? message.data : [];
+            // Only keep the most recent events up to maxEvents
+            events.value = initialEvents.slice(-maxEvents);
+          } else if (message.type === 'event') {
+            const newEvent = message.data as HookEvent;
+            events.value.push(newEvent);
+
+            // Limit events array to maxEvents, removing the oldest when exceeded
+            if (events.value.length > maxEvents) {
+              // Remove the oldest events (first 10) when limit is exceeded
+              events.value = events.value.slice(events.value.length - maxEvents + 10);
+            }
+          } else if (message.type === 'summary-update') {
+            // Handle summary updates - update existing event with new summary
+            const updatedEvent = message.data as HookEvent;
+            const index = events.value.findIndex(e => e.id === updatedEvent.id);
+            if (index !== -1) {
+              // Update the event in place to maintain reactivity
+              events.value[index] = { ...events.value[index], summary: updatedEvent.summary };
+            }
+          }
+        } catch (err) {
+          console.error('Failed to parse WebSocket message:', err);
         }
-      }
+      };
 
-      ws.value.onerror = (error) => {
-        console.error('WebSocket error:', error)
-        onError?.(error)
-      }
+      ws.onerror = (err) => {
+        console.error('WebSocket error:', err);
+        error.value = 'WebSocket connection error';
+      };
 
-      ws.value.onclose = () => {
-        console.log('WebSocket disconnected')
-        isConnected.value = false
-        ws.value = null
-        onDisconnect?.()
+      ws.onclose = () => {
+        console.log('WebSocket disconnected');
+        isConnected.value = false;
 
-        // Auto-reconnect
-        if (reconnect && !reconnectTimer.value) {
-          reconnectTimer.value = window.setTimeout(() => {
-            reconnectTimer.value = null
-            connect()
-          }, reconnectInterval)
-        }
-      }
-    } catch (error) {
-      console.error('Failed to create WebSocket connection:', error)
+        // Attempt to reconnect after 3 seconds
+        reconnectTimeout = window.setTimeout(() => {
+          console.log('Attempting to reconnect...');
+          connect();
+        }, 3000);
+      };
+    } catch (err) {
+      console.error('Failed to connect:', err);
+      error.value = 'Failed to connect to server';
     }
-  }
+  };
 
   const disconnect = () => {
-    if (reconnectTimer.value) {
-      clearTimeout(reconnectTimer.value)
-      reconnectTimer.value = null
+    if (reconnectTimeout) {
+      clearTimeout(reconnectTimeout);
+      reconnectTimeout = null;
     }
 
-    if (ws.value) {
-      ws.value.close()
-      ws.value = null
+    if (ws) {
+      ws.close();
+      ws = null;
     }
-
-    isConnected.value = false
-  }
-
-  const send = (message: any) => {
-    if (ws.value && isConnected.value) {
-      ws.value.send(JSON.stringify(message))
-    } else {
-      console.warn('WebSocket is not connected')
-    }
-  }
-
-  const subscribe = (sessionId: string) => {
-    send({ action: 'subscribe', sessionId })
-  }
-
-  const unsubscribe = (sessionId: string) => {
-    send({ action: 'unsubscribe', sessionId })
-  }
+  };
 
   onMounted(() => {
-    connect()
-  })
+    connect();
+  });
 
   onUnmounted(() => {
-    disconnect()
-  })
+    disconnect();
+  });
+
+  const clearEvents = () => {
+    events.value = [];
+  };
 
   return {
-    ws,
+    events,
     isConnected,
-    lastMessage,
-    connect,
-    disconnect,
-    send,
-    subscribe,
-    unsubscribe
-  }
+    error,
+    clearEvents
+  };
 }

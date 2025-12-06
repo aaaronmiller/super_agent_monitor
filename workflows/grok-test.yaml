@@ -1,0 +1,19 @@
+id: grok-test
+name: Grok Test Agent
+description: A test agent using the free Grok model via OpenRouter.
+version: 1.0.0
+orchestration:
+  pattern: ceo-worker
+  model: "free grok 4.1 fast:free"
+  temperature: 0.7
+components:
+  agents: []
+  skills: []
+  hooks: []
+  scripts: []
+memory:
+  enabled: false
+lifecycle:
+  haltDetectionSeconds: 300
+  autoRestart: false
+  maxRetries: 0

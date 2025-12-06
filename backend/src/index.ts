@@ -9,19 +9,24 @@ import { sessionsRouter } from './routes/sessions'
 import { sessionControlRouter } from './routes/session-control'
 import { memoryRouter } from './routes/memory'
 import { analyticsRouter } from './routes/analytics'
+import { schedulerRouter } from './routes/scheduler'
+import { plansRouter } from './routes/plans'
+import { converterRouter } from './routes/converter'
+import localModelsRouter from './routes/localModels'
 import { webSocketService } from './services/WebSocketService'
 import { sessionMonitor } from './services/SessionMonitor'
 import { sessionLauncher } from './services/SessionLauncher'
+import { schedulerService } from './services/SchedulerService'
 
 dotenv.config()
 
 const app = express()
 const PORT = process.env.PORT || 3001
 
-// Database connection pool
-export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/super_agent_monitor'
-})
+import { pool } from './db/pool'
+
+// Export pool for other modules
+export { pool }
 
 // Middleware
 app.use(cors())
@@ -32,6 +37,13 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
+// System Status Check
+app.get('/api/system/status', async (req, res) => {
+  const { systemCheckService } = await import('./services/SystemCheckService')
+  const status = await systemCheckService.runAllChecks()
+  res.json(status)
+})
+
 // API routes
 app.use('/api/components', componentsRouter)
 app.use('/api/workflows', workflowsRouter)
@@ -39,6 +51,10 @@ app.use('/api/sessions', sessionsRouter)
 app.use('/api/sessions', sessionControlRouter)
 app.use('/api/memory', memoryRouter)
 app.use('/api/analytics', analyticsRouter)
+app.use('/api/scheduler', schedulerRouter)
+app.use('/api/plans', plansRouter)
+app.use('/api/converter', converterRouter)
+app.use('/api/local-models', localModelsRouter)
 
 // Error handling
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -73,6 +89,10 @@ async function start() {
     const { componentRegistry } = await import('./services/ComponentRegistry')
     await componentRegistry.scan()
     console.log('✅ Component registry initialized')
+
+    // Initialize Scheduler
+    await schedulerService.init()
+    console.log('✅ Scheduler initialized')
 
     // Create HTTP server
     const server = createServer(app)

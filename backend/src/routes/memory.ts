@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express'
 import { memoryIngestion } from '../services/MemoryIngestion'
 import { ragRetrieval } from '../services/RAGRetrieval'
-import { pool } from '../index'
+import { pool } from '../db/pool'
 
 export const memoryRouter = Router()
 
@@ -37,6 +37,55 @@ memoryRouter.post('/ingest', async (req: Request, res: Response) => {
     console.error('Memory ingestion error:', error)
     res.status(500).json({
       error: 'Failed to ingest memory',
+      details: (error as Error).message
+    })
+  }
+})
+
+/**
+ * Get recent memories
+ * GET /api/memory/recent
+ */
+memoryRouter.get('/recent', async (req: Request, res: Response) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 50
+
+    const result = await pool.query(
+      `SELECT
+        id,
+        session_id,
+        workflow_id,
+        content,
+        content_type,
+        metadata,
+        tool_name,
+        timestamp,
+        importance_score,
+        tags
+       FROM memory_entries
+       ORDER BY timestamp DESC
+       LIMIT $1`,
+      [limit]
+    )
+
+    const memories = result.rows.map(row => ({
+      id: row.id,
+      content: row.content,
+      contentType: row.content_type,
+      metadata: row.metadata,
+      toolName: row.tool_name,
+      timestamp: row.timestamp,
+      importanceScore: row.importance_score,
+      tags: row.tags,
+      sessionId: row.session_id,
+      workflowId: row.workflow_id
+    }))
+
+    res.json({ memories, count: memories.length })
+  } catch (error) {
+    console.error('Error getting recent memories:', error)
+    res.status(500).json({
+      error: 'Failed to get recent memories',
       details: (error as Error).message
     })
   }

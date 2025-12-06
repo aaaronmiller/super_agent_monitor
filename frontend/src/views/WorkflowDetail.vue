@@ -13,9 +13,14 @@
             <h1 class="text-3xl font-bold">{{ workflow.name }}</h1>
             <p class="text-gray-500 mt-1">Template: {{ workflow.template_id }}</p>
           </div>
-          <span :class="['badge', workflow.status === 'active' ? 'badge-success' : 'badge-info']">
-            {{ workflow.status }}
-          </span>
+          <div class="flex items-center gap-3">
+            <span :class="['badge', workflow.status === 'active' ? 'badge-success' : 'badge-info']">
+              {{ workflow.status }}
+            </span>
+            <button @click="showStartModal = true" class="btn btn-primary btn-sm">
+              ▶ Start Session
+            </button>
+          </div>
         </div>
 
         <div class="grid grid-cols-2 gap-4 text-sm">
@@ -57,22 +62,37 @@
         </div>
       </div>
     </div>
+
+    <!-- Start Session Modal -->
+    <StartSessionModal
+      v-if="showStartModal"
+      :workflow-id="workflow.id"
+      @close="showStartModal = false"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
-import { useWorkflowsStore } from '../stores/workflows'
+import { ref, onMounted, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import StartSessionModal from '../components/StartSessionModal.vue'
 
 const route = useRoute()
+const router = useRouter()
 const workflowsStore = useWorkflowsStore()
+const sessionsStore = useSessionsStore()
+const componentsStore = useComponentsStore()
+
 
 const workflow = ref<any>(null)
+const showStartModal = ref(false)
 
 onMounted(async () => {
   const id = route.params.id as string
-  workflow.value = await workflowsStore.getWorkflow(id)
+  await Promise.all([
+    workflowsStore.getWorkflow(id).then(w => workflow.value = w),
+    componentsStore.fetchComponents({ category: 'orchestrator' })
+  ])
 })
 
 function formatDate(dateString: string) {

@@ -1,9 +1,14 @@
 import { spawn, ChildProcess } from 'child_process'
 import { EventEmitter } from 'events'
 import path from 'path'
-import { pool } from '../index'
+import { pool } from '../db/pool'
 import { v4 as uuidv4 } from 'uuid'
 import { memoryIngestion } from './MemoryIngestion'
+import { componentRegistry } from './ComponentRegistry'
+import { proxyService } from './ProxyService'
+import fs from 'fs/promises'
+
+import { sandboxService } from './SandboxService'
 
 export interface SessionConfig {
   workflowId: string
@@ -11,10 +16,16 @@ export interface SessionConfig {
   model?: string
   temperature?: number
   maxTokens?: number
+  orchestratorId?: string
+  sessionId?: string
+  contextInjection?: boolean
+  initialPrompt?: string
+  runtime?: 'local' | 'e2b'
+  metadata?: any
 }
 
 export interface SessionEvent {
-  type: 'start' | 'output' | 'error' | 'tool_use' | 'api_request' | 'api_response' | 'complete' | 'failed'
+  type: 'start' | 'output' | 'error' | 'tool_use' | 'api_request' | 'api_response' | 'complete' | 'failed' | 'system_context'
   timestamp: string
   data?: any
 }
@@ -32,17 +43,177 @@ export class SessionLauncher extends EventEmitter {
    * Launch a new Claude Code session
    */
   async launch(config: SessionConfig): Promise<string> {
-    const sessionId = uuidv4()
+    const sessionId = config.sessionId || uuidv4()
 
     try {
-      // Create session record in database
-      await pool.query(`
-        INSERT INTO sessions (id, workflow_id, status, started_at)
-        VALUES ($1, $2, 'pending', NOW())
-      `, [sessionId, config.workflowId])
+      // Create session record in database if it doesn't exist (or update if provided)
+      // If sessionId was provided, we assume the record exists (e.g. pending) or we upsert.
+      // For safety, we'll use ON CONFLICT DO NOTHING or just update status if it exists.
 
-      // Spawn Claude Code process
-      const claudeProcess = this.spawnClaudeProcess(sessionId, config)
+      if (config.sessionId) {
+        await pool.query(`
+            UPDATE sessions 
+            SET status = 'pending', started_at = NOW() 
+            WHERE id = $1
+          `, [sessionId])
+      } else {
+        await pool.query(`
+            INSERT INTO sessions (id, workflow_id, status, started_at)
+            VALUES ($1, $2, 'pending', NOW())
+          `, [sessionId, config.workflowId])
+      }
+
+      // Ensure proxy is running
+      let proxyPort = proxyService.getPort()
+      if (proxyPort === 0) {
+        proxyPort = await proxyService.start()
+      }
+      proxyService.registerSession(sessionId)
+
+      // Handle Orchestrator Injection & Context Injection
+      let finalConfigPath = config.claudeFolderPath
+      let isTempConfig = false
+      let injectedContent = ''
+
+      // 1. Get Orchestrator Template
+      if (config.orchestratorId) {
+        try {
+          console.log(`🔍 Loading orchestrator template for: ${config.orchestratorId}`)
+          injectedContent = await componentRegistry.getOrchestratorTemplate(config.orchestratorId)
+          console.log(`✅ Loaded orchestrator template (length: ${injectedContent.length})`)
+        } catch (error) {
+          console.warn(`⚠️ Failed to load orchestrator ${config.orchestratorId}:`, error)
+        }
+      }
+
+      // 2. Perform RAG Context Injection (if enabled and prompt provided)
+      if (config.contextInjection && config.initialPrompt) {
+        try {
+          const { ragRetrieval } = await import('./RAGRetrieval')
+          const results = await ragRetrieval.retrieve({
+            query: config.initialPrompt,
+            workflowId: config.workflowId,
+            limit: 5,
+            minImportance: 0.4
+          })
+
+          if (results.memories.length > 0) {
+            const contextStr = results.memories.map(m =>
+              `- [${m.timestamp}] ${m.content.substring(0, 200)}...`
+            ).join('\n')
+
+            injectedContent += `\n\n## 🧠 Context from Memory\n${contextStr}\n`
+            console.log(`🧠 Injected ${results.memories.length} memories into context`)
+
+            // Log system context event
+            await this.logEvent(sessionId, {
+              type: 'system_context',
+              timestamp: new Date().toISOString(),
+              data: {
+                count: results.memories.length,
+                memories: results.memories.map(m => ({
+                  timestamp: m.timestamp,
+                  content: m.content,
+                  score: m.similarityScore
+                }))
+              }
+            })
+          }
+        } catch (error) {
+          console.warn(`⚠️ Failed to inject context:`, error)
+        }
+      }
+
+      // 3. Write Temp Config if we have injected content
+      if (injectedContent) {
+        // If we didn't load an orchestrator, we need to read the original config first
+        if (!config.orchestratorId) {
+          try {
+            const originalContent = await fs.readFile(config.claudeFolderPath, 'utf-8')
+            injectedContent = originalContent + injectedContent
+          } catch (e) {
+            // If original doesn't exist, just use injected (rare)
+          }
+        }
+
+        const dir = path.dirname(config.claudeFolderPath)
+        const tempPath = path.join(dir, `CLAUDE.${sessionId}.md`)
+
+        await fs.writeFile(tempPath, injectedContent, 'utf-8')
+
+        finalConfigPath = tempPath
+        isTempConfig = true
+        console.log(`🎭 Created temp config at ${tempPath}`)
+      }
+
+      // Check runtime
+      if (config.runtime === 'e2b') {
+        console.log(`🚀 Launching E2B Sandbox Agent for session ${sessionId}`)
+
+        const repoUrl = config.metadata?.repoUrl || 'https://github.com/disler/claude-code-hooks-multi-agent-observability'
+        let prompt = config.initialPrompt || 'Check health'
+
+        if (injectedContent) {
+          prompt = injectedContent + "\n\nUser Task:\n" + prompt
+          console.log(`🧠 Injected context and orchestrator into E2B prompt (length: ${prompt.length})`)
+        }
+
+        // Path to sandbox_workflows app
+        const sandboxWorkflowsDir = path.resolve(process.cwd(), '../agent-sandboxes/apps/sandbox_workflows')
+
+        console.log(`   Repo: ${repoUrl}`)
+        console.log(`   Prompt: ${prompt}`)
+        console.log(`   CWD: ${sandboxWorkflowsDir}`)
+
+        const args = [
+          'run',
+          'python',
+          '-m',
+          'src.main',
+          repoUrl,
+          '--prompt',
+          prompt,
+          '--forks',
+          '1'
+        ]
+
+        console.log('Spawning agent with args:', args)
+
+        if (config.model) {
+          args.push('--model', config.model)
+        }
+
+        const agentProcess = spawn('uv', args, {
+          cwd: sandboxWorkflowsDir,
+          env: {
+            ...process.env,
+            SESSION_ID: sessionId
+          }
+        })
+
+        // Store session
+        this.sessions.set(sessionId, agentProcess)
+        this.sessionConfigs.set(sessionId, config)
+        this.lastActivity.set(sessionId, new Date())
+
+        // Setup event handlers (reuse existing setupProcessHandlers logic if compatible, or custom)
+        // sandbox-fork outputs logs to files, but also streams to stdout?
+        // Let's use setupProcessHandlers which handles stdout/stderr
+        this.setupProcessHandlers(sessionId, agentProcess)
+
+        // Update status to active
+        await this.updateSessionStatus(sessionId, 'active')
+
+        return sessionId
+      }
+
+      // Spawn Claude Code process (Local)
+      const claudeProcess = this.spawnClaudeProcess(sessionId, { ...config, claudeFolderPath: finalConfigPath })
+
+      // Store session metadata
+      if (isTempConfig) {
+        (claudeProcess as any).tempConfigPath = finalConfigPath
+      }
 
       // Store session
       this.sessions.set(sessionId, claudeProcess)
@@ -57,6 +228,11 @@ export class SessionLauncher extends EventEmitter {
 
       // Emit launch event
       this.emit('session:launched', { sessionId, config })
+
+      // Increment usage count for orchestrator
+      if (config.orchestratorId) {
+        await this.incrementUsage(config.orchestratorId)
+      }
 
       return sessionId
     } catch (error) {
@@ -99,16 +275,18 @@ export class SessionLauncher extends EventEmitter {
     console.log(`🚀 Launching Claude Code for session ${sessionId}`)
     console.log(`   Command: claude ${args.join(' ')}`)
 
-    const process = spawn('claude', args, {
+    const claudeProcess = spawn('claude', args, {
       cwd: path.dirname(config.claudeFolderPath),
       env: {
         ...process.env,
         ANTHROPIC_BASE_URL: process.env.CLAUDE_CODE_PROXY_URL || process.env.ANTHROPIC_BASE_URL,
-        SESSION_ID: sessionId
+        SESSION_ID: sessionId,
+        HTTP_PROXY: `http://127.0.0.1:${proxyService.getPort()}`,
+        HTTPS_PROXY: `http://127.0.0.1:${proxyService.getPort()}`
       }
     })
 
-    return process
+    return claudeProcess
   }
 
   /**
@@ -215,11 +393,16 @@ export class SessionLauncher extends EventEmitter {
         }
       } catch (error) {
         // Not JSON, just regular output
-        await this.logEvent(sessionId, {
+        const eventData: SessionEvent = {
           type: 'output',
           timestamp: new Date().toISOString(),
           data: { message: line }
-        })
+        }
+
+        await this.logEvent(sessionId, eventData)
+
+        // Emit for WebSocket streaming
+        this.emit('session:output', { sessionId, ...eventData })
       }
     }
   }
@@ -275,6 +458,17 @@ export class SessionLauncher extends EventEmitter {
     })
 
     this.emit('session:exit', { sessionId, status, code, signal })
+
+    // Clean up temp config if it exists
+    const process = this.sessions.get(sessionId)
+    if (process && (process as any).tempConfigPath) {
+      try {
+        await fs.unlink((process as any).tempConfigPath)
+        console.log(`🧹 Cleaned up temp config: ${(process as any).tempConfigPath}`)
+      } catch (error) {
+        console.warn(`⚠️ Failed to clean up temp config:`, error)
+      }
+    }
   }
 
   /**
@@ -320,6 +514,28 @@ export class SessionLauncher extends EventEmitter {
   }
 
   /**
+   * Kick a stalled session (send SIGINT)
+   */
+  async kick(sessionId: string): Promise<void> {
+    const process = this.sessions.get(sessionId)
+
+    if (!process) {
+      throw new Error(`Session ${sessionId} not found`)
+    }
+
+    console.log(`🥾 Kicking session ${sessionId} (SIGINT)`)
+
+    // Send SIGINT (Ctrl+C equivalent)
+    process.kill('SIGINT')
+
+    await this.logEvent(sessionId, {
+      type: 'output',
+      timestamp: new Date().toISOString(),
+      data: { message: 'User kicked the session (SIGINT)' }
+    })
+  }
+
+  /**
    * Restart a stalled session
    */
   async restart(sessionId: string): Promise<string> {
@@ -354,6 +570,67 @@ export class SessionLauncher extends EventEmitter {
   }
 
   /**
+   * Clone a session (start new one with same config, keep old one running)
+   */
+  async clone(sessionId: string): Promise<string> {
+    console.log(`👯 Cloning session ${sessionId}`)
+
+    let config = this.sessionConfigs.get(sessionId)
+
+    if (!config) {
+      // Try to fetch from DB
+      try {
+        const result = await pool.query(
+          'SELECT config_snapshot, workflow_id FROM sessions WHERE id = $1',
+          [sessionId]
+        )
+
+        if (result.rowCount && result.rowCount > 0) {
+          const row = result.rows[0]
+          // Reconstruct config
+          // We need to know if it was e2b or local. 
+          // config_snapshot should have it.
+          if (row.config_snapshot) {
+            config = row.config_snapshot
+          } else {
+            // Fallback if no snapshot (legacy?)
+            config = {
+              workflowId: row.workflow_id,
+              // Default to local if unknown? Or error?
+              // We'll assume local for safety or error.
+              runtime: 'local',
+              // We need claudeFolderPath for local runtime, but we don't have it in DB if not in snapshot.
+              // We can try to guess or just fail if it's missing.
+              // For now, let's assume it's in env or default.
+              claudeFolderPath: process.env.CLAUDE_FOLDER_PATH || '/Users/macuser/.claude'
+            }
+          }
+        }
+      } catch (err) {
+        console.warn(`Failed to fetch session ${sessionId} from DB for cloning:`, err)
+      }
+    }
+
+    if (!config) {
+      throw new Error(`Cannot clone session ${sessionId}: config not found in memory or DB`)
+    }
+
+    // Launch new session with same config
+    // Generate new ID automatically in launch()
+    const newConfig = { ...config, sessionId: undefined }
+    const newSessionId = await this.launch(newConfig)
+
+    // Log clone event
+    await this.logEvent(newSessionId, {
+      type: 'output',
+      timestamp: new Date().toISOString(),
+      data: { message: `Cloned from session ${sessionId}` }
+    })
+
+    return newSessionId
+  }
+
+  /**
    * Get active sessions
    */
   getActiveSessions(): string[] {
@@ -382,30 +659,34 @@ export class SessionLauncher extends EventEmitter {
   }
 
   /**
-   * Update session status in database
+   * Update session status in DB
    */
-  private async updateSessionStatus(sessionId: string, status: string, error?: string) {
-    const updates: string[] = ['status = $1', 'updated_at = NOW()']
-    const params: any[] = [status]
+  private async updateSessionStatus(
+    sessionId: string,
+    status: string,
+    error?: string
+  ) {
+    try {
+      // Schema has last_activity_at, not updated_at
+      const updates: string[] = ['status = $2', 'last_activity_at = NOW()']
+      const params: any[] = [sessionId, status]
 
-    if (status === 'completed' || status === 'failed') {
-      updates.push('completed_at = NOW()')
+      if (status === 'completed' || status === 'failed') {
+        updates.push('ended_at = NOW()')
+      }
+
+      if (error) {
+        updates.push(`error_message = $${params.length + 1}`)
+        params.push(error)
+      }
+
+      await pool.query(
+        `UPDATE sessions SET ${updates.join(', ')} WHERE id = $1`,
+        params
+      )
+    } catch (err) {
+      console.error(`Failed to update session status for ${sessionId}:`, err)
     }
-
-    if (error) {
-      params.push(error)
-      updates.push(`error = $${params.length}`)
-    }
-
-    params.push(sessionId)
-
-    await pool.query(`
-      UPDATE sessions
-      SET ${updates.join(', ')}
-      WHERE id = $${params.length}
-    `, params)
-
-    console.log(`[${sessionId}] Status updated: ${status}`)
   }
 
   /**
@@ -445,12 +726,28 @@ export class SessionLauncher extends EventEmitter {
    */
   private async logEvent(sessionId: string, event: SessionEvent) {
     try {
-      await pool.query(`
-        INSERT INTO events (session_id, type, timestamp, data)
-        VALUES ($1, $2, $3, $4)
-      `, [sessionId, event.type, event.timestamp, JSON.stringify(event.data)])
+      await pool.query(
+        'INSERT INTO events (session_id, event_type, timestamp, data) VALUES ($1, $2, NOW(), $3)',
+        [sessionId, event.type, JSON.stringify(event.data)]
+      )
     } catch (error) {
       console.error(`Failed to log event for session ${sessionId}:`, error)
+    }
+  }
+
+  /**
+   * Increment usage count for a component
+   */
+  private async incrementUsage(componentId: string) {
+    try {
+      await pool.query(`
+        UPDATE components
+        SET usage_count = COALESCE(usage_count, 0) + 1, updated_at = NOW()
+        WHERE id = $1
+      `, [componentId])
+      console.log(`📈 Incremented usage for component ${componentId}`)
+    } catch (error) {
+      console.error(`Failed to increment usage for ${componentId}:`, error)
     }
   }
 }

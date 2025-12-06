@@ -53,6 +53,27 @@ export const useMemoryStore = defineStore('memory', () => {
   }
 
   /**
+   * Fetch recent memories
+   */
+  async function fetchRecentMemories(limit: number = 50) {
+    loading.value = true
+    error.value = null
+
+    try {
+      const { data } = await api.get('/memory/recent', {
+        params: { limit }
+      })
+      memories.value = data.memories
+      return data
+    } catch (err: any) {
+      error.value = err.response?.data?.error || 'Failed to fetch recent memories'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
    * Get session context
    */
   async function getSessionContext(sessionId: string, limit: number = 20) {
@@ -153,6 +174,7 @@ export const useMemoryStore = defineStore('memory', () => {
     loading,
     error,
     searchMemories,
+    fetchRecentMemories,
     getSessionContext,
     getWorkflowHistory,
     findSimilar,

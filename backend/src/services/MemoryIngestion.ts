@@ -1,4 +1,4 @@
-import { pool } from '../index'
+import { pool } from '../db/pool'
 import { embeddingService } from './EmbeddingService'
 import { EventEmitter } from 'events'
 

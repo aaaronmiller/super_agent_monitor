@@ -23,7 +23,7 @@ export const useSessionsStore = defineStore('sessions', () => {
   async function fetchSessions(params?: { workflowId?: string; status?: string; limit?: number }) {
     loading.value = true
     error.value = null
-    
+
     try {
       const { data } = await api.get('/sessions', { params })
       sessions.value = data.sessions
@@ -64,10 +64,10 @@ export const useSessionsStore = defineStore('sessions', () => {
     }
   }
 
-  async function createSession(workflowId: string) {
+  async function createSession(workflowId: string, orchestratorId?: string, initialPrompt?: string, contextInjection?: boolean, runtime?: 'local' | 'e2b') {
     loading.value = true
     try {
-      const { data } = await api.post('/sessions', { workflowId })
+      const { data } = await api.post('/sessions', { workflowId, orchestratorId, initialPrompt, contextInjection, runtime })
       await fetchSessions()
       return data.session
     } catch (err: any) {
@@ -136,6 +136,26 @@ export const useSessionsStore = defineStore('sessions', () => {
     }
   }
 
+  async function cloneSession(id: string) {
+    try {
+      const { data } = await api.post(`/sessions/${id}/clone`)
+      return data
+    } catch (err: any) {
+      error.value = err.response?.data?.error || 'Failed to clone session'
+      throw err
+    }
+  }
+
+  async function kickSession(id: string) {
+    try {
+      const { data } = await api.post(`/sessions/${id}/kick`)
+      return data
+    } catch (err: any) {
+      error.value = err.response?.data?.error || 'Failed to kick session'
+      throw err
+    }
+  }
+
   async function getSessionStatus(id: string) {
     try {
       const { data } = await api.get(`/sessions/${id}/status`)
@@ -168,6 +188,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     startSession,
     stopSession,
     restartSession,
+    kickSession,
     getSessionStatus,
     getMonitorStats
   }

@@ -14,6 +14,11 @@ const router = createRouter({
       component: () => import('../views/ComponentLibrary.vue')
     },
     {
+      path: '/components/new',
+      name: 'agent-builder',
+      component: () => import('../views/AgentBuilder.vue')
+    },
+    {
       path: '/workflows',
       name: 'workflows',
       component: () => import('../views/WorkflowList.vue')
@@ -47,6 +52,26 @@ const router = createRouter({
       path: '/analytics',
       name: 'analytics',
       component: () => import('../views/Analytics.vue')
+    },
+    {
+      path: '/scheduler',
+      name: 'scheduler',
+      component: () => import('../views/Scheduler.vue')
+    },
+    {
+      path: '/builder',
+      name: 'builder',
+      component: () => import('../views/Builder.vue')
+    },
+    {
+      path: '/converter',
+      name: 'converter',
+      component: () => import('../views/McpConverter.vue')
+    },
+    {
+      path: '/help',
+      name: 'help',
+      component: () => import('../views/Help.vue')
     }
   ]
 })

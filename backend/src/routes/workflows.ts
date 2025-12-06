@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { workflowGenerator } from '../services/WorkflowGenerator'
-import { pool } from '../index'
+import { pool } from '../db/pool'
 
 export const workflowsRouter = Router()
 
@@ -10,7 +10,19 @@ export const workflowsRouter = Router()
  */
 workflowsRouter.get('/', async (req, res) => {
   try {
+    console.log('Listing workflows...')
     const templates = await workflowGenerator.listWorkflows()
+    console.log(`Found ${templates.length} templates`)
+
+    // Get usage counts from DB
+    console.log('Fetching usage counts...')
+    const usageResult = await pool.query(
+      "SELECT id, usage_count FROM components WHERE category = 'orchestrator'"
+    )
+    console.log(`Found ${usageResult.rowCount} usage records`)
+    const usageMap = new Map(
+      usageResult.rows.map((row: any) => [row.id, row.usage_count || 0])
+    )
 
     // Load details for each template
     const workflows = await Promise.all(
@@ -24,6 +36,7 @@ workflowsRouter.get('/', async (req, res) => {
             version: config.version,
             pattern: config.orchestration.pattern,
             model: config.orchestration.model,
+            usageCount: usageMap.get(config.id) || 0,
             components: {
               agents: config.components.agents?.length || 0,
               skills: config.components.skills?.length || 0,
@@ -38,11 +51,17 @@ workflowsRouter.get('/', async (req, res) => {
       })
     )
 
+    const validWorkflows = workflows.filter(Boolean) as any[]
+
+    // Sort by usage count (Trending)
+    validWorkflows.sort((a, b) => b.usageCount - a.usageCount)
+
     res.json({
-      workflows: workflows.filter(Boolean),
-      total: workflows.filter(Boolean).length
+      workflows: validWorkflows,
+      total: validWorkflows.length
     })
   } catch (error: any) {
+    console.error('Failed to list workflows:', error)
     res.status(500).json({ error: { code: 'LIST_ERROR', message: error.message } })
   }
 })

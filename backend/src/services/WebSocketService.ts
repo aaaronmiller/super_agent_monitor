@@ -92,10 +92,10 @@ export class WebSocketService {
         // Client wants to subscribe to specific session
         const sessionId = message.data?.sessionId
         if (sessionId) {
-          console.log(`📡 Client subscribed to session ${sessionId}`)
+          console.log(`📡 Client subscribed to session ${sessionId}`);
           // Store subscription info in client metadata
           (ws as any).subscriptions = (ws as any).subscriptions || []
-          ;(ws as any).subscriptions.push(sessionId)
+            ; (ws as any).subscriptions.push(sessionId)
         }
         break
 
@@ -103,7 +103,7 @@ export class WebSocketService {
         // Client wants to unsubscribe from session
         const unsubSessionId = message.data?.sessionId
         if (unsubSessionId && (ws as any).subscriptions) {
-          ;(ws as any).subscriptions = (ws as any).subscriptions.filter(
+          ; (ws as any).subscriptions = (ws as any).subscriptions.filter(
             (id: string) => id !== unsubSessionId
           )
           console.log(`📡 Client unsubscribed from session ${unsubSessionId}`)
@@ -155,6 +155,14 @@ export class WebSocketService {
     sessionLauncher.on('session:failed', (data) => {
       this.broadcast({
         type: 'session:failed',
+        data,
+        timestamp: new Date().toISOString()
+      })
+    })
+
+    sessionLauncher.on('session:output', (data) => {
+      this.broadcastToSession(data.sessionId, {
+        type: 'session:output',
         data,
         timestamp: new Date().toISOString()
       })

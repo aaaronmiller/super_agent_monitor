@@ -6,10 +6,10 @@
       <!-- Search Form -->
       <div class="card mb-6">
         <div class="mb-4">
-          <label class="block text-sm font-medium mb-2">Search Query</label>
+          <label class="block text-sm font-medium mb-2">Filter / Search</label>
           <textarea
             v-model="query"
-            placeholder="Describe what you're looking for (e.g., 'errors in the authentication flow')"
+            placeholder="Type to filter instantly, or click Search for deep retrieval..."
             class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             rows="3"
           ></textarea>
@@ -32,7 +32,7 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium mb-2">Min Similarity</label>
+            <label class="block text-sm font-medium mb-2">Min Similarity (for Search)</label>
             <input
               v-model.number="minSimilarity"
               type="number"
@@ -44,7 +44,7 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium mb-2">Limit</label>
+            <label class="block text-sm font-medium mb-2">Limit (for Search)</label>
             <input
               v-model.number="limit"
               type="number"
@@ -68,10 +68,10 @@
         <!-- Search Button -->
         <button
           @click="handleSearch"
-          :disabled="!query || loading"
+          :disabled="loading"
           class="btn btn-primary w-full md:w-auto"
         >
-          <span v-if="!loading">🔍 Search Memories</span>
+          <span v-if="!loading">🔍 Deep Search (RAG)</span>
           <span v-else>Searching...</span>
         </button>
       </div>
@@ -82,15 +82,15 @@
       </div>
 
       <!-- Results -->
-      <div v-if="searchResults.length > 0" class="mb-6">
+      <div v-if="filteredMemories.length > 0" class="mb-6">
         <div class="flex items-center justify-between mb-4">
-          <h2 class="text-2xl font-bold">Results</h2>
-          <span class="text-gray-500">{{ searchResults.length }} memories found</span>
+          <h2 class="text-2xl font-bold">Memories</h2>
+          <span class="text-gray-500">{{ filteredMemories.length }} items</span>
         </div>
 
         <div class="space-y-4">
           <div
-            v-for="memory in searchResults"
+            v-for="memory in filteredMemories"
             :key="memory.id"
             @click="viewMemoryDetails(memory.id)"
             :class="['card cursor-pointer hover:shadow-lg transition-shadow', getMemoryClass(memory.contentType)]"
@@ -143,17 +143,11 @@
 
       <!-- No Results -->
       <div
-        v-else-if="query && !loading && searchResults.length === 0"
+        v-else-if="!loading"
         class="text-center py-12 text-gray-500"
       >
-        <p class="text-lg">No memories found matching your query</p>
-        <p class="text-sm mt-2">Try adjusting your search criteria or lowering the minimum similarity</p>
-      </div>
-
-      <!-- Empty State -->
-      <div v-else-if="!query" class="text-center py-12 text-gray-500">
-        <p class="text-lg">Enter a search query to find relevant memories</p>
-        <p class="text-sm mt-2">Use natural language to describe what you're looking for</p>
+        <p class="text-lg">No memories found</p>
+        <p class="text-sm mt-2">Try adjusting your filter or performing a Deep Search</p>
       </div>
 
       <!-- Memory Detail Modal -->
@@ -252,7 +246,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useMemoryStore } from '../stores/memory'
 import type { Memory } from '../stores/memory'
 
@@ -264,14 +258,54 @@ const minSimilarity = ref(0.5)
 const limit = ref(10)
 const keywordsInput = ref('')
 
-const searchResults = ref<Memory[]>([])
+const displayedMemories = ref<Memory[]>([])
 const selectedMemory = ref<any>(null)
 const similarMemories = ref<Memory[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
 
+onMounted(async () => {
+  await loadRecentMemories()
+})
+
+async function loadRecentMemories() {
+  loading.value = true
+  try {
+    const data = await memoryStore.fetchRecentMemories(50)
+    displayedMemories.value = data.memories
+  } catch (err) {
+    console.error('Failed to load recent memories:', err)
+  } finally {
+    loading.value = false
+  }
+}
+
+const filteredMemories = computed(() => {
+  let result = displayedMemories.value
+
+  // Client-side text filter
+  if (query.value) {
+    const q = query.value.toLowerCase()
+    result = result.filter(m => 
+      m.content.toLowerCase().includes(q) || 
+      m.tags.some(t => t.toLowerCase().includes(q)) ||
+      (m.toolName && m.toolName.toLowerCase().includes(q))
+    )
+  }
+
+  // Client-side type filter
+  if (contentType.value) {
+    result = result.filter(m => m.contentType === contentType.value)
+  }
+
+  return result
+})
+
 async function handleSearch() {
-  if (!query.value) return
+  if (!query.value) {
+    await loadRecentMemories()
+    return
+  }
 
   loading.value = true
   error.value = null
@@ -290,7 +324,7 @@ async function handleSearch() {
       keywords: keywords.length > 0 ? keywords : undefined
     })
 
-    searchResults.value = result.memories
+    displayedMemories.value = result.memories
   } catch (err: any) {
     error.value = err.message || 'Search failed'
   } finally {

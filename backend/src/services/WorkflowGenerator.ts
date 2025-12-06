@@ -43,8 +43,8 @@ export class WorkflowGenerator {
   private outputDir: string
 
   constructor(
-    workflowsDir: string = path.join(process.cwd(), 'workflows'),
-    outputDir: string = path.join(process.cwd(), '.super_agent_monitor/workflows')
+    workflowsDir: string = path.join(process.cwd(), '../workflows'),
+    outputDir: string = path.join(process.cwd(), '../.super_agent_monitor/workflows')
   ) {
     this.workflowsDir = workflowsDir
     this.outputDir = outputDir

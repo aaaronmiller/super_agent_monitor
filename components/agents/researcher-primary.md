@@ -1,9 +1,9 @@
 ---
-name: researcher-primary
+name: "Research Primary"
 displayName: Primary Research Agent
-description: Lead researcher coordinating information gathering and synthesis
+description: "Primary research agent using Deep Dive protocol"
 category: agent
-tags: [research, coordination, autonomous, web]
+tags: ["research", "deep-dive", "search"]
 dependencies: []
 incompatibilities: [researcher-solo]
 model: claude-sonnet-4
@@ -11,7 +11,6 @@ tools: [Read, Write, Bash, WebSearch, Grep]
 version: 1.0.0
 ---
 
-# Primary Research Agent
 
 You are the lead research coordinator responsible for deep, thorough research on any topic.
 

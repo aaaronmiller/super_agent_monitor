@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express'
 import { sessionLauncher } from '../services/SessionLauncher'
 import { sessionMonitor } from '../services/SessionMonitor'
 import { workflowGenerator } from '../services/WorkflowGenerator'
-import { pool } from '../index'
+import { pool } from '../db/pool'
 
 export const sessionControlRouter = Router()
 
@@ -16,7 +16,7 @@ sessionControlRouter.post('/:id/start', async (req: Request, res: Response) => {
 
     // Check if session exists and is in pending state
     const sessionResult = await pool.query(
-      `SELECT s.*, w.config
+      `SELECT s.*, w.config, s.config_snapshot
        FROM sessions s
        JOIN workflows w ON s.workflow_id = w.id
        WHERE s.id = $1`,
@@ -45,7 +45,8 @@ sessionControlRouter.post('/:id/start', async (req: Request, res: Response) => {
     await sessionLauncher.launch({
       workflowId: session.workflow_id,
       claudeFolderPath,
-      sessionId
+      sessionId,
+      runtime: session.config_snapshot?.runtime || 'local'
     })
 
     res.json({
@@ -153,6 +154,39 @@ sessionControlRouter.post('/:id/restart', async (req: Request, res: Response) =>
     console.error('Error restarting session:', error)
     res.status(500).json({
       error: 'Failed to restart session',
+      details: (error as Error).message
+    })
+  }
+})
+
+/**
+ * Kick a session (force interrupt)
+ * POST /api/sessions/:id/kick
+ */
+sessionControlRouter.post('/:id/kick', async (req: Request, res: Response) => {
+  try {
+    const sessionId = req.params.id
+
+    // Check if session exists and is active
+    const isActive = sessionLauncher.isRunning(sessionId)
+
+    if (!isActive) {
+      res.status(400).json({ error: 'Session is not active' })
+      return
+    }
+
+    await sessionLauncher.kick(sessionId)
+
+    res.json({
+      success: true,
+      sessionId,
+      message: 'Session kicked successfully'
+    })
+
+  } catch (error) {
+    console.error('Error kicking session:', error)
+    res.status(500).json({
+      error: 'Failed to kick session',
       details: (error as Error).message
     })
   }

@@ -46,6 +46,17 @@
           </button>
 
           <button
+            v-if="['active', 'stalled'].includes(session.status) || liveStatus?.live?.isActive"
+            @click="handleKick"
+            :disabled="controlLoading"
+            class="btn btn-warning"
+            title="Force interrupt (SIGINT)"
+          >
+            <span v-if="!controlLoading">🥾 Kick</span>
+            <span v-else>Kicking...</span>
+          </button>
+
+          <button
             v-if="['active', 'stalled', 'failed'].includes(session.status)"
             @click="handleRestart"
             :disabled="controlLoading"
@@ -53,6 +64,16 @@
           >
             <span v-if="!controlLoading">🔄 Restart Session</span>
             <span v-else>Restarting...</span>
+          </button>
+
+          <button
+            @click="handleClone"
+            :disabled="controlLoading"
+            class="btn btn-primary"
+            title="Create a new session with same configuration"
+          >
+            <span v-if="!controlLoading">👯 Clone Session</span>
+            <span v-else>Cloning...</span>
           </button>
 
           <button
@@ -134,11 +155,26 @@
           <div class="bg-green-50 p-4 rounded-lg">
             <div class="text-sm text-green-600 mb-1">Total Cost</div>
             <div class="text-2xl font-bold text-green-900">
-              ${{ (liveStatus?.session?.cost_usd || session.cost_usd || 0).toFixed(4) }}
+              ${{ estimatedCost.toFixed(4) }}
             </div>
-            <div class="text-xs text-green-500 mt-1">Sonnet 4 Pricing</div>
+            <div class="text-xs text-green-500 mt-1">
+              Real-time Estimate (Kalman Filter)
+            </div>
           </div>
         </div>
+      </div>
+
+      <!-- Live Terminal (Typewriter Effect) -->
+      <div 
+        class="card mb-6 bg-gray-900 text-green-400 font-mono cursor-pointer hover:bg-gray-800 transition-colors" 
+        @click="flushTypewriter"
+        title="Click to skip animation"
+      >
+        <div class="flex justify-between items-center mb-2 border-b border-gray-700 pb-2">
+          <h2 class="text-lg font-bold">Live Terminal</h2>
+          <span class="text-xs text-gray-500">Buffered Stream (Click to Skip)</span>
+        </div>
+        <pre class="whitespace-pre-wrap h-64 overflow-y-auto text-sm">{{ liveTerminalOutput || '> Waiting for output...' }}</pre>
       </div>
 
       <!-- Metrics -->
@@ -198,9 +234,42 @@
                   <span v-if="event.type.includes('restarted')" class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
                     🔄 Restarted
                   </span>
+                  <span v-if="event.type === 'system_context'" class="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded">
+                    🧠 Context Injected
+                  </span>
                 </div>
                 <div class="text-sm text-gray-500 mt-1">{{ formatDate(event.timestamp) }}</div>
-                <pre v-if="event.data" class="text-xs text-gray-600 mt-2 overflow-x-auto bg-gray-50 p-2 rounded">{{ JSON.stringify(event.data, null, 2) }}</pre>
+                
+                <div v-if="event.type === 'system_context'" class="mt-2">
+                  <details class="bg-white bg-opacity-50 p-2 rounded text-sm border border-purple-200">
+                    <summary class="cursor-pointer font-medium text-purple-900 select-none">
+                      Injected {{ event.data?.count || 0 }} memories
+                    </summary>
+                    <div class="mt-2 space-y-2 pl-2">
+                      <div v-for="(mem, mIdx) in event.data?.memories" :key="mIdx" class="text-xs text-gray-700 border-l-2 border-purple-300 pl-2 bg-white p-2 rounded shadow-sm">
+                        <div class="flex justify-between text-purple-700 mb-1">
+                          <span class="font-bold">{{ formatDate(mem.timestamp) }}</span>
+                          <span>Score: {{ mem.score?.toFixed(2) }}</span>
+                        </div>
+                        <div class="whitespace-pre-wrap font-mono text-gray-600">{{ mem.content }}</div>
+                      </div>
+                    </div>
+                  </details>
+                </div>
+
+                <div v-else-if="event.type === 'session:tool_use' || event.type === 'tool_use'" class="mt-2">
+                  <div class="bg-white bg-opacity-50 p-3 rounded text-sm border border-blue-200">
+                    <div class="flex items-center gap-2 mb-2">
+                      <span class="font-bold text-blue-800">🛠️ {{ event.data?.tool }}</span>
+                      <span class="text-xs text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">Tool Call</span>
+                    </div>
+                    <div class="bg-gray-900 text-gray-300 p-2 rounded font-mono text-xs overflow-x-auto">
+                      {{ JSON.stringify(event.data?.input, null, 2) }}
+                    </div>
+                  </div>
+                </div>
+
+                <pre v-else-if="event.data" class="text-xs text-gray-600 mt-2 overflow-x-auto bg-gray-50 p-2 rounded">{{ JSON.stringify(event.data, null, 2) }}</pre>
               </div>
             </div>
           </div>
@@ -220,10 +289,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useSessionsStore } from '../stores/sessions'
 import { useWebSocket, type WSMessage } from '../composables/useWebSocket'
+import { CostEstimator } from '../utils/CostEstimator'
+import { Typewriter } from '../utils/Typewriter'
 
 const route = useRoute()
 const sessionsStore = useSessionsStore()
@@ -233,6 +304,15 @@ const metrics = ref<any>(null)
 const liveStatus = ref<any>(null)
 const realtimeEvents = ref<WSMessage[]>([])
 const controlLoading = ref(false)
+
+// Runtime Reliability State
+const estimatedCost = ref(0)
+const liveTerminalOutput = ref('')
+const estimator = new CostEstimator()
+const typewriter = new Typewriter((text) => {
+  liveTerminalOutput.value = text
+})
+let animationFrameId: number | null = null
 
 // WebSocket connection
 const { isConnected, subscribe, unsubscribe } = useWebSocket({
@@ -252,11 +332,33 @@ onMounted(async () => {
   await loadSession(id)
   await loadMetrics(id)
   await loadLiveStatus(id)
+  
+  // Initialize estimator with current cost
+  if (session.value?.cost_usd) {
+    estimator.updateMeasurement(session.value.cost_usd)
+    estimatedCost.value = session.value.cost_usd
+  }
+
+  // Start animation loop for cost prediction
+  let lastTime = performance.now()
+  const loop = () => {
+    const now = performance.now()
+    const dt = (now - lastTime) / 1000
+    lastTime = now
+    
+    estimatedCost.value = estimator.predict(dt)
+    animationFrameId = requestAnimationFrame(loop)
+  }
+  loop()
 })
 
 onUnmounted(() => {
   const sessionId = route.params.id as string
   unsubscribe(sessionId)
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId)
+  }
+  typewriter.reset()
 })
 
 async function loadSession(id: string) {
@@ -334,6 +436,27 @@ async function handleRestart() {
   }
 }
 
+async function handleClone() {
+  if (!confirm('Create a new session with the same configuration?')) return
+
+  controlLoading.value = true
+  try {
+    const id = route.params.id as string
+    const result = await sessionsStore.cloneSession(id)
+    
+    if (result.newSessionId) {
+      alert(`Session cloned! New ID: ${result.newSessionId}`)
+      // Navigate to new session
+      // router.push(`/sessions/${result.newSessionId}`)
+    }
+  } catch (error) {
+    console.error('Failed to clone session:', error)
+    alert('Failed to clone session')
+  } finally {
+    controlLoading.value = false
+  }
+}
+
 function handleWebSocketMessage(message: WSMessage) {
   console.log('WebSocket message:', message)
 
@@ -357,10 +480,32 @@ function handleWebSocketMessage(message: WSMessage) {
     const id = route.params.id as string
     loadLiveStatus(id)
   }
+  
+  // Feed Runtime Reliability Utilities
+  if (message.data?.cost_usd) {
+    estimator.updateMeasurement(message.data.cost_usd)
+  }
+  
+  // Handle Terminal Output (stdout or session:output)
+  if (message.type === 'stdout' && message.data?.text) {
+    typewriter.push(message.data.text)
+  } else if (message.type === 'session:output' && message.data?.message) {
+    typewriter.push(message.data.message)
+  }
+  
+  if (message.type === 'session:thinking') {
+    estimator.setThinking(true)
+  } else if (message.type === 'session:generating' || message.type === 'stdout' || message.type === 'session:output') {
+    estimator.setThinking(false)
+  }
 }
 
 function clearEvents() {
   realtimeEvents.value = []
+}
+
+function flushTypewriter() {
+  typewriter.flush()
 }
 
 function formatDate(dateString: string) {
@@ -397,6 +542,9 @@ function getEventClass(eventType: string) {
   }
   if (eventType.includes('tool_use')) {
     return 'bg-blue-50 border-blue-500'
+  }
+  if (eventType === 'system_context') {
+    return 'bg-purple-50 border-purple-500'
   }
   return 'bg-gray-50 border-gray-300'
 }

@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { pool } from '../index'
+import { pool } from '../db/pool'
 
 export const sessionsRouter = Router()
 
@@ -61,7 +61,7 @@ sessionsRouter.get('/:id', async (req, res) => {
         (
           SELECT json_agg(json_build_object(
             'id', e.id,
-            'type', e.type,
+            'type', e.event_type,
             'timestamp', e.timestamp,
             'data', e.data
           ) ORDER BY e.timestamp DESC)
@@ -180,7 +180,8 @@ sessionsRouter.get('/:id/metrics', async (req, res) => {
  */
 sessionsRouter.post('/', async (req, res) => {
   try {
-    const { workflowId } = req.body
+    console.log('Creating session:', req.body)
+    const { workflowId, config, runtime } = req.body
 
     if (!workflowId) {
       return res.status(400).json({
@@ -188,10 +189,37 @@ sessionsRouter.post('/', async (req, res) => {
       })
     }
 
-    // Verify workflow exists
+    // Verify workflow exists and resolve UUID if needed
+    let targetWorkflowId = workflowId
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+    if (!uuidRegex.test(workflowId)) {
+      console.log(`Resolving non-UUID workflow ID: ${workflowId}`)
+      try {
+        // Import dynamically to avoid circular dependencies if any
+        const { workflowGenerator } = await import('../services/WorkflowGenerator')
+        const config = await workflowGenerator.loadWorkflow(workflowId)
+
+        const nameCheck = await pool.query(
+          'SELECT id FROM workflows WHERE name = $1',
+          [config.name]
+        )
+
+        if (nameCheck.rowCount && nameCheck.rowCount > 0) {
+          targetWorkflowId = nameCheck.rows[0].id
+          console.log(`Resolved to UUID: ${targetWorkflowId}`)
+        } else {
+          console.warn(`Workflow with name "${config.name}" not found in DB`)
+        }
+      } catch (err) {
+        console.error('Failed to resolve workflow ID:', err)
+        // Fall through to let the UUID check fail naturally or handle gracefully
+      }
+    }
+
     const workflowCheck = await pool.query(
       'SELECT id FROM workflows WHERE id = $1',
-      [workflowId]
+      [targetWorkflowId]
     )
 
     if (workflowCheck.rowCount === 0) {
@@ -205,19 +233,54 @@ sessionsRouter.post('/', async (req, res) => {
       INSERT INTO sessions (
         workflow_id,
         status,
-        started_at
-      ) VALUES ($1, 'pending', NOW())
+        started_at,
+        config_snapshot
+      ) VALUES ($1, 'pending', NOW(), $2)
       RETURNING id, workflow_id, status, started_at
-    `, [workflowId])
+    `, [targetWorkflowId, { runtime, ...config }])
 
     const session = result.rows[0]
 
+    // Launch session
+    const { sessionLauncher } = await import('../services/SessionLauncher')
+    // We need to construct SessionConfig
+    // The sessionLauncher.launch expects SessionConfig
+    // We should pass the ID we just created
+    sessionLauncher.launch({
+      sessionId: session.id,
+      workflowId: targetWorkflowId,
+      claudeFolderPath: '', // Will be generated or ignored for E2B
+      runtime: runtime as 'local' | 'e2b',
+      initialPrompt: config.initialPrompt,
+      orchestratorId: config.orchestratorId,
+      contextInjection: config.contextInjection,
+      metadata: config.metadata
+    }).catch(err => console.error(`Failed to launch session ${session.id}:`, err))
+
     res.status(201).json({
       session,
-      message: 'Session created successfully'
+      message: 'Session created and launched successfully'
     })
   } catch (error: any) {
     res.status(500).json({ error: { code: 'CREATE_ERROR', message: error.message } })
+  }
+})
+
+/**
+ * POST /api/sessions/:id/clone
+ * Clone a session (start new one with same config)
+ */
+sessionsRouter.post('/:id/clone', async (req, res) => {
+  try {
+    const { sessionLauncher } = await import('../services/SessionLauncher')
+    const newSessionId = await sessionLauncher.clone(req.params.id)
+
+    res.status(201).json({
+      newSessionId,
+      message: 'Session cloned successfully'
+    })
+  } catch (error: any) {
+    res.status(500).json({ error: { code: 'CLONE_ERROR', message: error.message } })
   }
 })
 

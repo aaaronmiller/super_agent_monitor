@@ -130,12 +130,35 @@ componentsRouter.post('/recommendations', async (req, res) => {
         description: c.description,
         category: c.category,
         tags: c.tags,
-        reason: this.getRecommendationReason(c, selectedComponents)
+        reason: getRecommendationReason(c, selectedComponents)
       })),
       total: recommendations.length
     })
   } catch (error: any) {
     res.status(500).json({ error: { code: 'RECOMMENDATION_ERROR', message: error.message } })
+  }
+})
+
+/**
+ * POST /api/components
+ * Create or update a component
+ * Body: { id: string, content: string }
+ */
+componentsRouter.post('/', async (req, res) => {
+  try {
+    const { id, content } = req.body
+
+    if (!id || !content) {
+      return res.status(400).json({
+        error: { code: 'INVALID_INPUT', message: 'id and content are required' }
+      })
+    }
+
+    await componentRegistry.saveComponent(id, content)
+
+    res.json({ success: true, id })
+  } catch (error: any) {
+    res.status(500).json({ error: { code: 'SAVE_ERROR', message: error.message } })
   }
 })
 

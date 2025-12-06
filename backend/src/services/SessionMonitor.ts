@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events'
 import { sessionLauncher } from './SessionLauncher'
-import { pool } from '../index'
+import { pool } from '../db/pool'
 
 export interface MonitorConfig {
   stallDetectionSeconds: number  // Time without activity to consider stalled

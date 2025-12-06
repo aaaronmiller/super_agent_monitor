@@ -1,0 +1,28 @@
+{
+  "model": "claude-sonnet-4",
+  "temperature": 0.3,
+  "thinkingBudget": 5000,
+  "maxTokens": 4000,
+  "systemPrompt": "./CLAUDE.md",
+  "hooks": {
+    "cost-tracker": {
+      "path": "./hooks/cost-tracker.py",
+      "trigger": "after_tool_use"
+    },
+    "format-enforcer": {
+      "path": "./hooks/format-enforcer.py",
+      "trigger": "after_tool_use"
+    }
+  },
+  "memory": {
+    "enabled": true,
+    "persistence": "session",
+    "rag": false
+  },
+  "lifecycle": {
+    "stall_detection_seconds": 180,
+    "auto_restart": true,
+    "max_retries": 2,
+    "kick_prompt": "Continue with code implementation. Check your progress and implement the next feature."
+  }
+}

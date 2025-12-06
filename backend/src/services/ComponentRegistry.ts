@@ -39,21 +39,27 @@ export class ComponentRegistry {
     console.log(`🔍 Scanning components in ${this.componentsDir}...`)
     this.components.clear()
 
-    const categories = ['agents', 'skills', 'hooks', 'scripts', 'orchestrators']
+    const categoryMap: Record<string, Component['category']> = {
+      agents: 'agent',
+      skills: 'skill',
+      hooks: 'hook',
+      scripts: 'script',
+      orchestrators: 'orchestrator'
+    }
 
-    for (const category of categories) {
-      const categoryPath = path.join(this.componentsDir, category)
+    for (const [dirName, category] of Object.entries(categoryMap)) {
+      const categoryPath = path.join(this.componentsDir, dirName)
 
       try {
         const exists = await fs.access(categoryPath).then(() => true).catch(() => false)
         if (!exists) {
-          console.warn(`⚠️  Category directory not found: ${category}`)
+          console.warn(`⚠️  Category directory not found: ${dirName}`)
           continue
         }
 
-        await this.scanCategory(categoryPath, category as any)
+        await this.scanCategory(categoryPath, category)
       } catch (error) {
-        console.error(`Error scanning ${category}:`, error)
+        console.error(`Error scanning ${dirName}:`, error)
       }
     }
 
@@ -133,8 +139,8 @@ export class ComponentRegistry {
         filePath,
         content,
         language,
-        category,
-        ...metadata
+        ...metadata,
+        category: metadata.category || category
       }
 
       this.components.set(id, component)
@@ -312,6 +318,68 @@ export class ComponentRegistry {
    */
   getLastScanTime(): Date | null {
     return this.lastScanTime
+  }
+
+  /**
+   * Get orchestrator template content by ID
+   */
+  async getOrchestratorTemplate(id: string): Promise<string> {
+    const component = this.getById(id)
+    if (!component) {
+      throw new Error(`Orchestrator not found: ${id}`)
+    }
+
+    if (component.category !== 'orchestrator') {
+      throw new Error(`Component ${id} is not an orchestrator`)
+    }
+
+    // Re-read file to ensure fresh content
+    return fs.readFile(component.filePath, 'utf-8')
+  }
+
+  /**
+   * Save component content
+   */
+  async saveComponent(id: string, content: string): Promise<void> {
+    const component = this.getById(id)
+
+    // If component exists, overwrite it
+    if (component) {
+      await fs.writeFile(component.filePath, content, 'utf-8')
+
+      // Re-index
+      await this.indexComponent(component.filePath, component.category)
+      return
+    }
+
+    // If new component, we need to determine path
+    // For now, we only support creating new Agents via this API
+    // ID format: category:name
+    const [category, name] = id.split(':')
+
+    if (!category || !name) {
+      throw new Error('Invalid ID format. Expected category:name')
+    }
+
+    const validCategories = ['agent', 'orchestrator']
+    if (!validCategories.includes(category)) {
+      throw new Error(`Cannot create component of category ${category}`)
+    }
+
+    // Sanitize filename
+    const safeName = name.toLowerCase().replace(/[^a-z0-9-_]/g, '-')
+    const filename = `${safeName}.md`
+    const dir = category === 'agent' ? 'agents' : 'orchestrators' // map singular to plural
+    const filePath = path.join(this.componentsDir, dir, filename)
+
+    // Ensure directory exists
+    await fs.mkdir(path.dirname(filePath), { recursive: true })
+
+    // Write file
+    await fs.writeFile(filePath, content, 'utf-8')
+
+    // Index new component
+    await this.indexComponent(filePath, category as any)
   }
 
   /**
