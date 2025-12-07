@@ -49,6 +49,11 @@ export interface HookEvent {
     chat?: any[];
     hitl_question?: string;
     hitl_permission?: string;
+    // Enhanced visualization fields
+    orchestrator_type?: string; // e.g., 'ceo-council', 'playoff-debate'
+    runtime?: 'e2b' | 'local';  // Execution environment
+    context_injection?: boolean; // Whether RAG was used
+    cost_usd?: number;          // Cost of this event
 }
 
 export interface FilterOptions {
@@ -60,4 +65,11 @@ export interface FilterOptions {
 export interface WebSocketMessage {
     type: 'initial' | 'event' | 'summary-update';
     data: any;
+}
+
+export interface ChartDataPoint {
+    timestamp: number;
+    count: number;
+    eventTypes?: Record<string, number>;
+    sessions?: Record<string, number>;
 }

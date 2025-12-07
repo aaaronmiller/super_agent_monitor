@@ -200,7 +200,10 @@ export function useChartData(agentIdFilter?: string) {
             let bucket = dataPoints.value.find(dp => dp.timestamp === bucketTime);
             if (bucket) {
                 bucket.count++;
+                if (!bucket.eventTypes) bucket.eventTypes = {};
                 bucket.eventTypes[event.hook_event_type] = (bucket.eventTypes[event.hook_event_type] || 0) + 1;
+
+                if (!bucket.sessions) bucket.sessions = {};
                 bucket.sessions[event.session_id] = (bucket.sessions[event.session_id] || 0) + 1;
             } else {
                 dataPoints.value.push({
@@ -290,39 +293,51 @@ export function useChartData(agentIdFilter?: string) {
         }, 0);
     });
 
-    // Compute event timing metrics (min, max, average gap between events in ms)
+    // Compute event timing metrics
     const eventTimingMetrics = computed(() => {
         const now = Date.now();
         const config = currentConfig.value;
         const cutoffTime = now - config.duration;
 
-        // Get all events in current time window, sorted by timestamp
-        const windowEvents = allEvents.value
-            .filter(e => e.timestamp && e.timestamp >= cutoffTime)
-            .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+        // Get all events in current time window
+        const windowEvents = allEvents.value.filter(e => e.timestamp && e.timestamp >= cutoffTime);
+        const eventCount = windowEvents.length;
+        const durationSeconds = config.duration / 1000;
 
-        if (windowEvents.length < 2) {
-            return { minGap: 0, maxGap: 0, avgGap: 0 };
-        }
+        // Calculate Events Per Second (average over the window)
+        const eventsPerSecond = eventCount / durationSeconds;
 
-        // Calculate gaps between consecutive events
-        const gaps: number[] = [];
-        for (let i = 1; i < windowEvents.length; i++) {
-            const gap = (windowEvents[i].timestamp || 0) - (windowEvents[i - 1].timestamp || 0);
-            if (gap > 0) {
-                gaps.push(gap);
+        // Calculate Peak Events Per Second (based on buckets)
+        // Find the bucket with the highest count in the current window
+        const windowBuckets = dataPoints.value.filter(dp => dp.timestamp >= cutoffTime);
+        const maxBucketCount = windowBuckets.length > 0 ? Math.max(...windowBuckets.map(dp => dp.count)) : 0;
+        const bucketDurationSec = config.bucketSize / 1000;
+        const peakEventsPerSecond = maxBucketCount / bucketDurationSec;
+
+        // Calculate Avg Time Between Events
+        let avgTimeBetweenEvents = 0;
+        if (windowEvents.length >= 2) {
+            // Sort by timestamp
+            const sortedEvents = [...windowEvents].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+            const gaps: number[] = [];
+            for (let i = 1; i < sortedEvents.length; i++) {
+                const gap = (sortedEvents[i].timestamp || 0) - (sortedEvents[i - 1].timestamp || 0);
+                if (gap > 0) gaps.push(gap);
+            }
+            if (gaps.length > 0) {
+                avgTimeBetweenEvents = gaps.reduce((a, b) => a + b, 0) / gaps.length;
             }
         }
 
-        if (gaps.length === 0) {
-            return { minGap: 0, maxGap: 0, avgGap: 0 };
-        }
-
-        const minGap = Math.min(...gaps);
-        const maxGap = Math.max(...gaps);
-        const avgGap = gaps.reduce((a, b) => a + b, 0) / gaps.length;
-
-        return { minGap, maxGap, avgGap };
+        return {
+            eventsPerSecond,
+            peakEventsPerSecond,
+            avgTimeBetweenEvents,
+            // Keep legacy props if needed elsewhere, though LivePulseChart uses the above
+            minGap: 0,
+            maxGap: 0,
+            avgGap: avgTimeBetweenEvents
+        };
     });
 
     return {

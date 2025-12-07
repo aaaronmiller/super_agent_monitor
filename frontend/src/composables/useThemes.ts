@@ -713,9 +713,8 @@ export function useThemes() {
         if (savedTheme) {
             setTheme(savedTheme);
         } else {
-            // Detect system preference
-            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-            setTheme(prefersDark ? 'dark' : 'light');
+            // Default to 'dark' for Disler aesthetic
+            setTheme('dark');
         }
     };
 

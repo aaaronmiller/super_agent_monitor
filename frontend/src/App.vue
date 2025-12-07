@@ -29,5 +29,29 @@ onMounted(() => {
   transition-duration: 200ms;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* Disler Theme Variables (if not already defined in global css) */
+:root {
+  --theme-bg-secondary: #1e1e1e;
+  --theme-bg-tertiary: #252526;
+  --theme-border-primary: #333;
+  --theme-primary: #3b82f6; /* Blue-500 */
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent; 
+}
+::-webkit-scrollbar-thumb {
+  background: var(--theme-border-secondary); 
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--theme-border-primary); 
+}
 </style>
 

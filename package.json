@@ -8,7 +8,8 @@
         "dev:backend": "cd backend && npm run dev",
         "dev:frontend": "cd frontend && npm run dev",
         "start:headless": "cd backend && npm start",
-        "test": "cd backend && npm test"
+        "test": "cd backend && npm test",
+        "quickstart": "./dev.sh"
     },
     "devDependencies": {
         "concurrently": "^8.2.2"

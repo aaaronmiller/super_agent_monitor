@@ -222,7 +222,7 @@ export class WebSocketService {
       }
     })
 
-    console.log(`📢 Broadcast: ${message.type} to ${this.clients.size} clients`)
+    // console.log(`📢 Broadcast: ${message.type} to ${this.clients.size} clients`)
   }
 
   /**
@@ -234,6 +234,7 @@ export class WebSocketService {
 
     this.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
+        // Use extended type for subscriptions
         const subscriptions = (client as any).subscriptions as string[] || []
 
         // Send to clients subscribed to this session or all sessions
@@ -244,7 +245,7 @@ export class WebSocketService {
       }
     })
 
-    console.log(`📢 Broadcast to session ${sessionId}: ${message.type} to ${sentCount} clients`)
+    // console.log(`📢 Broadcast to session ${sessionId}: ${message.type} to ${sentCount} clients`)
   }
 
   /**

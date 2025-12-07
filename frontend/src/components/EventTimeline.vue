@@ -1,71 +1,7 @@
 <template>
   <div class="flex-1 mobile:h-[50vh] overflow-hidden flex flex-col">
     <!-- Fixed Header -->
-    <div class="px-3 py-4 mobile:py-2 bg-gradient-to-r from-[var(--theme-bg-primary)] to-[var(--theme-bg-secondary)] relative z-10" style="box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.3), 0 8px 25px -5px rgba(0, 0, 0, 0.2);">
-      <h2 class="text-2xl mobile:text-lg font-bold text-[var(--theme-primary)] text-center drop-shadow-sm">
-        Agent Event Stream
-      </h2>
-
-      <!-- Agent/App Tags Row -->
-      <div v-if="displayedAgentIds.length > 0" class="mt-3 flex flex-wrap gap-2 mobile:gap-1.5 justify-start">
-        <button
-          v-for="agentId in displayedAgentIds"
-          :key="agentId"
-          @click="emit('selectAgent', agentId)"
-          :class="[
-            'text-base mobile:text-sm font-bold px-3 mobile:px-2 py-1 rounded-full border-2 shadow-lg transition-all duration-200 hover:shadow-xl hover:scale-105 cursor-pointer',
-            isAgentActive(agentId)
-              ? 'text-[var(--theme-text-primary)] bg-[var(--theme-bg-tertiary)]'
-              : 'text-[var(--theme-text-tertiary)] bg-[var(--theme-bg-tertiary)] opacity-50 hover:opacity-75'
-          ]"
-          :style="{
-            borderColor: getHexColorForApp(getAppNameFromAgentId(agentId)),
-            backgroundColor: getHexColorForApp(getAppNameFromAgentId(agentId)) + (isAgentActive(agentId) ? '33' : '1a')
-          }"
-          :title="`${isAgentActive(agentId) ? 'Active: Click to add' : 'Sleeping: No recent events. Click to add'} ${agentId} to comparison lanes`"
-        >
-          <span class="mr-2">{{ isAgentActive(agentId) ? '✨' : '😴' }}</span>
-          <span class="font-mono text-sm">{{ agentId }}</span>
-        </button>
-      </div>
-
-      <!-- Search Bar -->
-      <div class="mt-3 mobile:mt-2 w-full">
-        <div class="flex items-center gap-2 mobile:gap-1">
-          <div class="relative flex-1">
-            <input
-              type="text"
-              :value="searchPattern"
-              @input="updateSearchPattern(($event.target as HTMLInputElement).value)"
-              placeholder="Search events (regex enabled)... e.g., 'tool.*error' or '^GET'"
-              :class="[
-                'w-full px-3 mobile:px-2 py-2 mobile:py-1.5 rounded-lg text-sm mobile:text-xs font-mono border-2 transition-all duration-200',
-                'bg-[var(--theme-bg-tertiary)] text-[var(--theme-text-primary)] placeholder-[var(--theme-text-quaternary)]',
-                'border-[var(--theme-border-primary)] focus:border-[var(--theme-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-primary)]/20',
-                searchError ? 'border-[var(--theme-accent-error)]' : ''
-              ]"
-              aria-label="Search events with regex pattern"
-            />
-            <button
-              v-if="searchPattern"
-              @click="clearSearch"
-              class="absolute right-2 top-1/2 transform -translate-y-1/2 text-[var(--theme-text-tertiary)] hover:text-[var(--theme-primary)] transition-colors duration-200"
-              title="Clear search"
-              aria-label="Clear search"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-        <div
-          v-if="searchError"
-          class="mt-1.5 mobile:mt-1 px-2 py-1.5 mobile:py-1 bg-[var(--theme-accent-error)]/10 border border-[var(--theme-accent-error)] rounded-lg text-xs mobile:text-[11px] text-[var(--theme-accent-error)] font-semibold"
-          role="alert"
-        >
-          <span class="inline-block mr-1">⚠️</span> {{ searchError }}
-        </div>
-      </div>
-    </div>
+    <!-- Internal Header Removed - controlled by Dashboard -->
     
     <!-- Scrollable Event List -->
     <div 
@@ -114,6 +50,7 @@ const props = defineProps<{
     eventType: string;
   };
   stickToBottom: boolean;
+  searchQuery?: string; // External search query
   uniqueAppNames?: string[]; // Agent IDs (app:session) active in current time window
   allAppNames?: string[]; // All agent IDs (app:session) ever seen in session
 }>();
@@ -142,6 +79,23 @@ const isAgentActive = (agentId: string): boolean => {
   return (props.uniqueAppNames || []).includes(agentId);
 };
 
+// Get agent metadata for badges (council type, E2B status, RAG status)
+// This extracts metadata from the most recent event for this agent
+const getAgentMetadata = (agentId: string): { councilType?: string; isE2B?: boolean; hasRag?: boolean } => {
+  // Find recent events for this agent
+  const agentEvents = props.events.filter(e => `${e.source_app}:${e.session_id.slice(0, 8)}` === agentId);
+  if (agentEvents.length === 0) return {};
+  
+  // Get the most recent event
+  const latestEvent = agentEvents[agentEvents.length - 1];
+  
+  return {
+    councilType: latestEvent.orchestrator_type || latestEvent.payload?.orchestrator_type,
+    isE2B: latestEvent.runtime === 'e2b' || latestEvent.payload?.runtime === 'e2b',
+    hasRag: latestEvent.context_injection || latestEvent.payload?.context_injection
+  };
+};
+
 const filteredEvents = computed(() => {
   let filtered = props.events.filter(event => {
     if (props.filters.sourceApp && event.source_app !== props.filters.sourceApp) {
@@ -156,9 +110,10 @@ const filteredEvents = computed(() => {
     return true;
   });
 
-  // Apply regex search filter
-  if (searchPattern.value) {
-    filtered = searchEvents(filtered, searchPattern.value);
+  // Apply regex search filter (prop or internal)
+  const pattern = props.searchQuery || searchPattern.value;
+  if (pattern) {
+    filtered = searchEvents(filtered, pattern);
   }
 
   return filtered;

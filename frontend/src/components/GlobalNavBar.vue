@@ -1,54 +1,71 @@
 <template>
-  <nav class="bg-gradient-to-r from-[var(--theme-bg-secondary)] to-[var(--theme-bg-primary)] border-b border-[var(--theme-border-primary)] px-6 py-3 shadow-md sticky top-0 z-50 transition-colors duration-300">
+  <nav class="bg-gradient-to-r from-[var(--theme-primary)] to-[var(--theme-primary-light)] border-b-2 border-[var(--theme-primary-dark)] px-4 py-4 shadow-lg sticky top-0 z-50 transition-colors duration-300">
     <div class="flex items-center justify-between max-w-[1920px] mx-auto">
       <!-- Left: Title & Status -->
       <div class="flex items-center space-x-6">
         <router-link to="/" class="flex items-center space-x-4 group">
-          <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-[var(--theme-primary)] to-[var(--theme-primary-light)] drop-shadow-sm flex items-center">
-            <span class="text-3xl mr-2 transform group-hover:scale-110 transition-transform">🕵️‍♂️</span>
-            Super Agent Monitor
+          <h1 class="text-2xl font-bold text-white drop-shadow-md flex items-center">
+             Multi-Agent Observability
           </h1>
         </router-link>
         
-        <div class="h-6 w-px bg-[var(--theme-border-primary)]"></div>
+        <div class="h-6 w-px bg-white/20"></div>
         
         <div class="flex items-center space-x-2 text-sm">
-          <span class="flex h-2.5 w-2.5 rounded-full" :class="isConnected ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-500'"></span>
-          <span :class="isConnected ? 'text-green-600 dark:text-green-400 font-medium' : 'text-red-600 dark:text-red-400 font-medium'">
-            {{ isConnected ? 'Connected' : 'Disconnected' }}
-          </span>
+           <div v-if="isConnected" class="flex items-center space-x-1.5">
+            <span class="relative flex h-3 w-3">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+            </span>
+            <span class="text-white font-semibold drop-shadow-md">Connected</span>
+          </div>
+          <div v-else class="flex items-center space-x-1.5">
+             <span class="relative flex h-3 w-3">
+              <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+            </span>
+            <span class="text-white font-semibold drop-shadow-md">Disconnected</span>
+          </div>
         </div>
       </div>
 
-      <!-- Center: Navigation Links -->
-      <div class="hidden xl:flex items-center space-x-1 bg-[var(--theme-bg-tertiary)] rounded-lg p-1 border border-[var(--theme-border-primary)] shadow-inner">
-        <router-link 
-          v-for="item in navItems" 
-          :key="item.path" 
-          :to="item.path"
-          class="px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 flex items-center space-x-2"
-          active-class="bg-[var(--theme-primary)] text-white shadow-md"
-          :class="$route.path === item.path ? '' : 'text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-primary)]'"
-        >
-          <span>{{ item.icon }}</span>
-          <span>{{ item.name }}</span>
-        </router-link>
-      </div>
+      <!-- Center: Event Count (Disler Style) -->
+       <div class="hidden xl:flex items-center">
+          <span class="text-base text-white font-semibold drop-shadow-md bg-[var(--theme-primary-dark)] px-3 py-1.5 rounded-full border border-white/30">
+            {{ events.length }} Events
+          </span>
+       </div>
       
-      <!-- Right: Theme Toggle -->
-      <div class="flex items-center space-x-4">
-        <div class="flex bg-[var(--theme-bg-tertiary)] rounded-lg p-1 border border-[var(--theme-border-primary)] shadow-inner">
+      <!-- Right: Navigation & Theme Toggle (Simplified for Header integration) -->
+      <div class="flex items-center space-x-3">
+         <!-- Nav Links as Icon Buttons to save space/match look -->
+         <div class="flex items-center space-x-1">
+            <router-link 
+              v-for="item in navItems.slice(0, 3)" 
+              :key="item.path" 
+              :to="item.path"
+              class="p-2 rounded-lg bg-white/20 hover:bg-white/30 text-white transition-all duration-200 border border-white/30 hover:border-white/50 backdrop-blur-sm"
+              active-class="bg-white/40 shadow-inner"
+              :title="item.name"
+            >
+              <span>{{ item.icon }}</span>
+            </router-link>
+         </div>
+
+         <div class="h-6 w-px bg-white/20 mx-2"></div>
+
+        <!-- Theme Toggle -->
+        <div class="flex bg-white/10 rounded-lg p-1 border border-white/20">
           <button 
             v-for="t in displayThemes" 
             :key="t.id"
             @click="setTheme(t.id)"
-            class="px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 flex items-center space-x-1"
+            class="p-1.5 rounded-md text-xs font-medium transition-all duration-200 flex items-center justify-center min-w-[32px]"
             :class="currentTheme === t.id 
-              ? 'bg-[var(--theme-primary)] text-white shadow-md transform scale-105' 
-              : 'text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-primary)]'"
+              ? 'bg-white text-[var(--theme-primary)] shadow-sm' 
+              : 'text-white/70 hover:text-white hover:bg-white/10'"
+            :title="t.name"
           >
             <span>{{ t.icon }}</span>
-            <span class="hidden 2xl:inline">{{ t.name }}</span>
           </button>
         </div>
       </div>
@@ -63,7 +80,7 @@ import { useWebSocket } from '../composables/useWebSocket';
 import { useThemes } from '../composables/useThemes';
 
 const route = useRoute();
-const { isConnected } = useWebSocket();
+const { isConnected, events } = useWebSocket();
 const { state, setTheme } = useThemes();
 
 const currentTheme = computed(() => state.value.currentTheme);

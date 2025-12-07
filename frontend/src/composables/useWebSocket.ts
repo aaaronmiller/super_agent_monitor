@@ -1,7 +1,8 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import type { HookEvent, WebSocketMessage } from '../types';
 
-export function useWebSocket(url: string = 'ws://localhost:3001') {
+// Use environment variable for WebSocket URL, fallback to localhost default
+export function useWebSocket(url: string = import.meta.env.VITE_WEBSOCKET_URL || 'ws://localhost:3001/ws') {
   const events = ref<HookEvent[]>([]);
   const isConnected = ref(false);
   const error = ref<string | null>(null);
@@ -64,7 +65,7 @@ export function useWebSocket(url: string = 'ws://localhost:3001') {
 
         // Attempt to reconnect after 3 seconds
         reconnectTimeout = window.setTimeout(() => {
-          console.log('Attempting to reconnect...');
+          console.debug('Attempting to reconnect...');
           connect();
         }, 3000);
       };

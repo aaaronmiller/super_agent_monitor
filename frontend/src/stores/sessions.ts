@@ -51,6 +51,7 @@ export const useSessionsStore = defineStore('sessions', () => {
       const { data } = await api.get(`/sessions/${id}/metrics`)
       return data.metrics
     } catch (err: any) {
+      error.value = err.response?.data?.error?.message || 'Failed to fetch metrics'
       throw err
     }
   }
@@ -60,6 +61,7 @@ export const useSessionsStore = defineStore('sessions', () => {
       const { data } = await api.get(`/sessions/${id}/events`, { params })
       return data
     } catch (err: any) {
+      error.value = err.response?.data?.error?.message || 'Failed to fetch events'
       throw err
     }
   }
@@ -161,6 +163,7 @@ export const useSessionsStore = defineStore('sessions', () => {
       const { data } = await api.get(`/sessions/${id}/status`)
       return data
     } catch (err: any) {
+      error.value = err.response?.data?.error?.message || 'Failed to fetch session status'
       throw err
     }
   }
