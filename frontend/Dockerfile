@@ -1,37 +1,36 @@
-# Multi-stage build for Frontend
+# Frontend Dockerfile for Svelte 5 + Ice-ninja Stack
 
-# Stage 1: Build
-FROM node:18-alpine AS build
+FROM oven/bun:1-alpine AS base
 
+# Stage 1: Dependencies
+FROM base AS deps
+WORKDIR /app
+COPY package.json bun.lockb ./
+RUN bun install --frozen-lockfile
+
+# Stage 2: Build
+FROM deps AS builder
+WORKDIR /app
+COPY . .
+RUN bun run build
+
+# Stage 3: Runtime
+FROM base AS runtime
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy built assets
+COPY --from=builder /app/build ./build
+COPY package.json ./
 
-# Install dependencies
-RUN npm ci
+# Install only production dependencies
+RUN bun install --frozen-lockfile --production
 
-# Copy source code
-COPY . .
-
-# Build for production
-RUN npm run build
-
-# Stage 2: Production server
-FROM nginx:alpine
-
-# Copy built files to nginx
-COPY --from=build /app/dist /usr/share/nginx/html
-
-# Copy nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# Expose port
-EXPOSE 3000
+# Expose port (SvelteKit preview default)
+EXPOSE 4173
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --quiet --tries=1 --spider http://localhost:3000/ || exit 1
+    CMD wget --quiet --tries=1 --spider http://localhost:4173/ || exit 1
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Run with bun
+CMD ["bun", "run", "preview", "--host", "0.0.0.0", "--port", "4173"]

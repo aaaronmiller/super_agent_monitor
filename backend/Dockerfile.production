@@ -1,0 +1,84 @@
+# 🔒 Ironclad Backend - Production Dockerfile
+# Multi-stage build with security hardening
+# Includes: Hono API, WebSocket Server, Phase 6 features
+
+FROM oven/bun:1.1-alpine AS base
+
+# Install security updates and essential packages
+RUN apk update && apk upgrade --no-cache && \
+    apk add --no-cache \
+    curl \
+    ca-certificates \
+    wget \
+    tini \
+    && rm -rf /var/cache/apk/*
+
+# Create non-root user for security
+RUN addgroup --gid 1001 --system nodejs \
+    && adduser --system --uid 1001 --ingroup nodejs hono
+
+WORKDIR /app
+
+# ==================== STAGE 1: DEPENDENCIES ====================
+FROM base AS deps
+
+# Copy package files
+COPY package.json bun.lockb* ./
+
+# Install production dependencies only
+# Use ci for frozen lockfile
+RUN bun install --frozen-lockfile --production
+
+# ==================== STAGE 2: BUILDER ====================
+FROM base AS builder
+
+# Copy all source code
+COPY . .
+
+# Run TypeScript compilation and build
+# Assumes you have a build script that compiles to dist/
+RUN bun run build
+
+# ==================== STAGE 3: RUNNER ====================
+FROM base AS runner
+
+# Copy from previous stages
+COPY --from=deps --chown=hono:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=hono:nodejs /app/dist ./dist
+COPY --from=builder --chown=hono:nodejs /app/package.json ./
+COPY --from=builder --chown=hono:nodejs /app/bun.lockb* ./
+
+# Copy health check script
+COPY --chown=hono:nodejs health-check.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/health-check.sh
+
+# Create log directory
+RUN mkdir -p /app/logs && chown -R hono:nodejs /app
+
+# Security: Switch to non-root user
+USER hono
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD /usr/local/bin/health-check.sh
+
+# Expose HTTP API port
+EXPOSE 3001
+
+# Expose WebSocket port
+EXPOSE 8080
+
+# Use tini for proper signal handling
+ENTRYPOINT ["/sbin/tini", "--"]
+
+# Start the application
+CMD ["bun", "dist/index.js"]
+
+# ==================== METADATA ====================
+LABEL com.ironclad.service="backend" \
+      com.ironclad.version="1.0.0" \
+      com.ironclad.phases="1-6" \
+      com.ironclad.maintainer="ice-ninja" \
+      com.ironclad.created="2025-01-07" \
+      com.ironclad.security="non-root-user" \
+      com.ironclad.runtime="bun"

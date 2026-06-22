@@ -1,0 +1,53 @@
+{
+  "model": "claude-sonnet-4-5-20250929",
+  "temperature": 0.7,
+  "thinkingBudget": 15000,
+  "tools": [
+    "Task",
+    "Read",
+    "Write",
+    "Edit",
+    "Bash",
+    "Glob",
+    "Grep",
+    "TodoWrite",
+    "WebSearch",
+    "WebFetch"
+  ],
+  "memoryBank": {
+    "enabled": true,
+    "path": "memory/memory-bank.json",
+    "crdtEnabled": true,
+    "autoBackup": true,
+    "backupInterval": 300
+  },
+  "migrationConfig": {
+    "sourceDirectory": "source/",
+    "targetDirectory": "target/",
+    "maxConcurrentTranslators": 4,
+    "validationStrategies": [
+      "property-based-testing",
+      "contract-testing",
+      "performance-benchmarking"
+    ],
+    "deploymentStrategy": "canary",
+    "rollbackEnabled": true
+  },
+  "supportedLanguages": {
+    "source": ["python", "javascript", "java", "ruby", "php", "csharp", "typescript"],
+    "target": ["go", "typescript", "rust", "python", "kotlin", "java"]
+  },
+  "astParsers": {
+    "python": "ast",
+    "javascript": "acorn",
+    "typescript": "typescript",
+    "java": "javaparser",
+    "go": "go/parser",
+    "rust": "syn"
+  },
+  "validation": {
+    "propertyTestIterations": 1000,
+    "performanceThreshold": 1.1,
+    "minimumCoverage": 0.85
+  }
+}

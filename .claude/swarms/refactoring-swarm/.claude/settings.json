@@ -1,0 +1,56 @@
+{
+  "model": "claude-sonnet-4-5-20250929",
+  "temperature": 0.3,
+  "thinkingBudget": 15000,
+  "systemPrompt": "You are the Code Refactoring Swarm Orchestrator. Follow CLAUDE.md instructions precisely.",
+  "tools": [
+    "Task",
+    "Read",
+    "Write",
+    "Edit",
+    "Bash",
+    "Glob",
+    "Grep",
+    "TodoWrite",
+    "WebSearch",
+    "WebFetch"
+  ],
+  "swarmConfig": {
+    "maxParallelAgents": 3,
+    "enableMemoryBank": true,
+    "memoryPersistence": true,
+    "memoryPath": "memory/memory-bank.json",
+    "validationMode": "strict",
+    "autoRevert": true,
+    "maxRetries": 3,
+    "checkpointInterval": 5
+  },
+  "refactoringRules": {
+    "minComplexityThreshold": 10,
+    "maxMethodLength": 50,
+    "maxClassLength": 300,
+    "duplicateCodeThreshold": 6,
+    "enabledRefactorings": [
+      "extract_method",
+      "extract_class",
+      "rename_variable",
+      "inline_variable",
+      "simplify_conditional",
+      "remove_duplicate_code",
+      "optimize_imports",
+      "fix_naming_conventions"
+    ]
+  },
+  "qualityGates": {
+    "requireTestPass": true,
+    "requireLinterPass": true,
+    "requireBuildSuccess": true,
+    "requireCodeReview": true,
+    "minCoverageIncrease": 0,
+    "maxComplexityIncrease": 0
+  },
+  "sparcMode": {
+    "enabled": true,
+    "phases": ["specification", "pseudocode", "architecture", "refinement", "completion"]
+  }
+}

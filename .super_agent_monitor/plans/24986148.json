@@ -1,0 +1,54 @@
+{
+  "plan_id": "24986148",
+  "goal": "Test goal",
+  "tasks": [
+    {
+      "id": "24986148-1",
+      "description": "Analyze requirements for: Test goal",
+      "agent_type": "single",
+      "agent": "analyzer",
+      "priority": 1,
+      "dependencies": [],
+      "status": "pending",
+      "result": null
+    },
+    {
+      "id": "24986148-2",
+      "description": "Create implementation plan for: Test goal",
+      "agent_type": "single",
+      "agent": "product-manager",
+      "priority": 2,
+      "dependencies": [
+        "24986148-1"
+      ],
+      "status": "pending",
+      "result": null
+    },
+    {
+      "id": "24986148-4",
+      "description": "Test generation for: Test goal",
+      "agent_type": "swarm",
+      "agent": "test-swarm",
+      "priority": 3,
+      "dependencies": [
+        "24986148-2"
+      ],
+      "status": "pending",
+      "result": null
+    },
+    {
+      "id": "24986148-final",
+      "description": "Final review and decision for: Test goal",
+      "agent_type": "council",
+      "agent": "review-council",
+      "priority": 5,
+      "dependencies": [
+        "24986148-4"
+      ],
+      "status": "pending",
+      "result": null
+    }
+  ],
+  "created_at": "2025-12-11T02:53:40.933385",
+  "status": "pending"
+}

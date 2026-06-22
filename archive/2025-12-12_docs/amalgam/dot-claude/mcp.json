@@ -1,0 +1,18 @@
+{
+  "$schema": "https://schema.claude.ai/mcp.config.v1.json",
+  "mcpServers": {
+    "delobotomize-memory": {
+      "command": "node",
+      "args": ["dist/mcp/memory-server.js"],
+      "disabled": true
+    },
+    "agentic-delobotomize": {
+      "command": "node",
+      "args": ["agentic-delobotomize/server/index.js"],
+      "disabled": true,
+      "env": {
+        "PORT": "3001"
+      }
+    }
+  }
+}

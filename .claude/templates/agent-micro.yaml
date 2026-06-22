@@ -1,0 +1,11 @@
+characteristics:
+  complexity: simple
+  cost: low
+  speed: fast
+  use_cases:
+  - file operations
+  - quick searches
+  - simple validation
+model: claude-haiku-4-20250514
+thinking_budget: 2000
+type: micro

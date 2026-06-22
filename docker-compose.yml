@@ -1,14 +1,18 @@
+# 🐳 Ironclad System - Production Docker Compose
+# Complete Platform: Phases 1-6
+# Includes: PostgreSQL, Redis, Backend (Hono), Frontend (SvelteKit), WebSocket, Redis, Caddy
+
 version: '3.8'
 
 services:
-  # PostgreSQL with pgvector extension
+  # PostgreSQL with pgvector extension (Phase 1-3: Vector DB)
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: super_agent_monitor_db
+    container_name: ironclad_postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-super_agent_monitor}
+      POSTGRES_DB: ${POSTGRES_DB:-ironclad_db}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -19,66 +23,293 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - super_agent_network
+      - ironclad_network
     restart: unless-stopped
+    labels:
+      - "com.ironclad.service=postgres"
+      - "com.ironclad.phase=1-3"
+      - "com.ironclad.component=vector-db"
 
-  # Backend API server
+  # Redis - Session Store & WebSocket Pub/Sub (Phase 6: Real-time)
+  redis:
+    image: redis:7-alpine
+    container_name: ironclad_redis
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-ironclad_secure}
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save 60 1
+      --appendonly yes
+      --appendfsync everysec
+      --tcp-keepalive 300
+      --timeout 0
+    volumes:
+      - redis_data:/data
+    ports:
+      # Only expose for development, comment out for production
+      # - "6379:6379"
+    networks:
+      - ironclad_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    labels:
+      - "com.ironclad.service=redis"
+      - "com.ironclad.phase=6"
+      - "com.ironclad.component=realtime-store"
+
+  # Backend API server (Phase 1-6: All services)
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: super_agent_monitor_backend
+    container_name: ironclad_backend
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-super_agent_monitor}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      # Database (Phase 1-3)
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-ironclad_db}
+
+      # Redis (Phase 6)
+      REDIS_URL: redis://redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-ironclad_secure}
+
+      # API Configuration
       PORT: 3001
       NODE_ENV: ${NODE_ENV:-production}
+
+      # OpenAI (Phase 1-2)
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+
+      # Agent Configuration (Phase 3-4)
       STALL_DETECTION_SECONDS: ${STALL_DETECTION_SECONDS:-300}
       MONITOR_CHECK_INTERVAL_SECONDS: ${MONITOR_CHECK_INTERVAL_SECONDS:-60}
       MAX_SESSION_RETRIES: ${MAX_SESSION_RETRIES:-3}
       WS_PATH: ${WS_PATH:-/ws}
+
+      # Security (Phase 6)
+      JWT_SECRET: ${JWT_SECRET}
+      SESSION_SECRET: ${SESSION_SECRET}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+
+      # CI/CD Integration (Phase 6)
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      GITLAB_TOKEN: ${GITLAB_TOKEN}
+
+      # Monitoring (Phase 6)
+      SENTRY_DSN: ${SENTRY_DSN}
+
+      # WebSocket Server (Phase 6)
+      WS_PORT: 8080
+
     ports:
-      - "${BACKEND_PORT:-3001}:3001"
+      - "${BACKEND_PORT:-3001}:3001"  # HTTP API
+      - "8080:8080"                    # WebSocket (Phase 6)
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     volumes:
       - ./backend:/app
       - /app/node_modules
       - claude_workflows:/app/.workflows
+      - backend_logs:/app/logs
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
       interval: 30s
       timeout: 10s
       retries: 3
     networks:
-      - super_agent_network
+      - ironclad_network
     restart: unless-stopped
     command: bun run start
+    labels:
+      - "com.ironclad.service=backend"
+      - "com.ironclad.version=1.0.0"
+      - "com.ironclad.phases=1-6"
 
-  # Frontend application
+  # Frontend application (Phase 5-6: Production UI)
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: super_agent_monitor_frontend
+      target: runtime
+    container_name: ironclad_frontend
     environment:
-      VITE_API_BASE_URL: http://localhost:${BACKEND_PORT:-3001}
+      # API endpoints
+      VITE_API_BASE_URL: ${PUBLIC_API_URL:-http://backend:3001}
+      VITE_WS_URL: ${PUBLIC_WS_URL:-ws://backend:8080/ws}
+
+      # Feature flags
+      VITE_ENABLE_ANALYTICS: "true"
+      VITE_ENABLE_REALTIME: "true"
+      VITE_ENABLE_RBAC: "true"
+      VITE_ENABLE_CI: "true"
+
+      # Security
+      VITE_JWT_EXPIRY: "24h"
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+      - "${FRONTEND_PORT:-5173}:4173"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - ironclad_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4173/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    labels:
+      - "com.ironclad.service=frontend"
+      - "com.ironclad.version=1.0.0"
+      - "com.ironclad.phases=5-6"
+
+  # Reverse Proxy with SSL (Phase 6: Production)
+  caddy:
+    image: caddy:2-alpine
+    container_name: ironclad_proxy
+    ports:
+      - "80:80"      # HTTP
+      - "443:443"    # HTTPS
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      - ACME_EMAIL=${ACME_EMAIL:-admin@localhost}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:5173}
+      - BACKEND_URL=http://backend:3001
+      - FRONTEND_URL=http://frontend:4173
     depends_on:
       - backend
-    networks:
-      - super_agent_network
+      - frontend
     restart: unless-stopped
+    networks:
+      - ironclad_network
+    labels:
+      - "com.ironclad.service=caddy"
+      - "com.ironclad.phase=6"
+      - "com.ironclad.component=reverse-proxy"
 
+  # Optional: Redis Commander (Development only)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: ironclad_redis_ui
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-ironclad_secure}
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - ironclad_network
+    profiles:
+      - dev
+      - debug
+    labels:
+      - "com.ironclad.service=redis-commander"
+      - "com.ironclad.utility=debug"
+
+  # Optional: Adminer for PostgreSQL (Development only)
+  adminer:
+    image: adminer:latest
+    container_name: ironclad_db_ui
+    ports:
+      - "8082:8080"
+    environment:
+      - ADMINER_DEFAULT_SERVER=postgres
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - ironclad_network
+    profiles:
+      - dev
+      - debug
+    labels:
+      - "com.ironclad.service=adminer"
+      - "com.ironclad.utility=debug"
+
+# Volumes for persistent data
 volumes:
   postgres_data:
     driver: local
+    labels:
+      - "com.ironclad.volume=postgres-data"
+      - "com.ironclad.phase=1-3"
+
+  redis_data:
+    driver: local
+    labels:
+      - "com.ironclad.volume=redis-data"
+      - "com.ironclad.phase=6"
+
   claude_workflows:
     driver: local
+    labels:
+      - "com.ironclad.volume=workflows"
+      - "com.ironclad.phase=4"
 
+  backend_logs:
+    driver: local
+    labels:
+      - "com.ironclad.volume=logs"
+
+  caddy_data:
+    driver: local
+    labels:
+      - "com.ironclad.volume=caddy-data"
+      - "com.ironclad.phase=6"
+
+  caddy_config:
+    driver: local
+    labels:
+      - "com.ironclad.volume=caddy-config"
+      - "com.ironclad.phase=6"
+
+# Network configuration
 networks:
-  super_agent_network:
+  ironclad_network:
     driver: bridge
+    name: ironclad_network
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.25.0.0/16
+    labels:
+      - "com.ironclad.network=default"
+
+# Deployment profiles for resource management
+x-deploy-defaults: &deploy-defaults
+  restart_policy:
+    condition: on-failure
+    delay: 5s
+    max_attempts: 3
+    window: 120s
+  update_config:
+    parallelism: 1
+    delay: 10s
+    order: start-first
+  rollback_config:
+    parallelism: 1
+    delay: 10s
+    order: stop-first
+
+# Stack metadata
+x-stack-metadata: &stack-metadata
+  com.ironclad.stack: "complete-platform"
+  com.ironclad.version: "1.0.0"
+  com.ironclad.phases: "1-6"
+  com.ironclad.deployment: "production"
+  com.ironclad.maintainer: "ice-ninja"
+  com.ironclad.created: "2025-01-07"

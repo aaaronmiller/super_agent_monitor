@@ -1,0 +1,12 @@
+characteristics:
+  complexity: general-purpose
+  cost: medium
+  speed: balanced
+  use_cases:
+  - code generation
+  - analysis
+  - review
+  - orchestration
+model: claude-sonnet-4-20250514
+thinking_budget: 10000
+type: standard

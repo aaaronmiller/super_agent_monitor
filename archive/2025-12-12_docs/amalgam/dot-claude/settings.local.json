@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:pypi.org)",
+      "WebFetch(domain:aider.chat)",
+      "Bash(git init)",
+      "Bash(git add -A)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nInitial commit: Delobotomize project foundation\n\n🎯 Project: Emergency triage system for mid-project AI disasters\n📚 Analysis: Complete extraction of artifacts + transcript insights\n🏗️ Structure: TypeScript CLI with 5-phase architecture\n\n## What''s Included:\n\n### Analysis Phase (Complete):\n- ✅ 6 artifacts extracted from ARTIFACTS.md\n- ✅ 24 unique insights from CONVERSATION_TRANSCRIPT.md\n- ✅ ~900 lines of production-ready code identified\n- ✅ Complete integration plan (10-week roadmap)\n\n### Foundation Files:\n- package.json (TypeScript, Commander.js, testing framework)\n- tsconfig.json (ES2022, strict mode)\n- README.md (project overview, quick start)\n- LICENSE (MIT)\n- .gitignore (Node.js + TypeScript)\n\n### Analysis Documentation:\n- analysis/COMPLETE_INTEGRATION_PLAN.md (implementation roadmap)\n- analysis/TRANSCRIPT_INSIGHTS_SUMMARY.md (24 insights)\n- analysis/ARTIFACTS_ASSESSMENT_TRACKER.md (6 artifacts)\n- analysis/artifacts/ (5 extracted artifact docs)\n- analysis/transcript-insights/ (3 chunk analyses)\n\n### Research & Background:\n- docs/REVISED_ARCHITECTURE.md (5-phase design)\n- research/ (competitive analysis, capacity research)\n\n### Source Material:\n- ARTIFACTS.md (6 artifacts from DataKiln)\n- CONVERSATION_TRANSCRIPT.md (full debugging session)\n- RAG.md (chunking strategies)\n\n## Next Steps:\nWeek 1-2: Implement core scanner + classifier (from Artifact #3)\n\n🚀 Generated with Claude Code\n   Built from real-world AI disaster recovery\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Skill(superpowers:using-superpowers)",
+      "WebFetch(domain:code.claude.com)",
+      "Skill(superpowers:systematic-debugging)",
+      "mcp__exa__get_code_context_exa",
+      "mcp__exa__web_search_exa",
+      "WebFetch(domain:www.claudelog.com)",
+      "WebFetch(domain:claudecode.io)",
+      "WebFetch(domain:callmephilip.com)",
+      "WebFetch(domain:gigazine.net)",
+      "mcp__byterover-mcp__byterover-retrieve-knowledge"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

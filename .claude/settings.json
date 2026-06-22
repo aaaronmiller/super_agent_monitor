@@ -1,0 +1,115 @@
+{
+    "permissions": {
+        "auto_approve": {
+            "Write": [
+                "**/*"
+            ],
+            "Edit": [
+                "**/*"
+            ],
+            "Bash": [
+                "**/*"
+            ]
+        },
+        "sandbox": false,
+        "block": [
+            ".env*",
+            "*.pem",
+            "*.key",
+            "**/secrets/**"
+        ]
+    },
+    "hooks": {
+        "PreToolUse": [
+            {
+                "matcher": "*",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "uv run .claude/hooks/pre_tool_use.py --summarize"
+                    }
+                ]
+            }
+        ],
+        "PostToolUse": [
+            {
+                "matcher": "*",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "uv run .claude/hooks/post_tool_use.py --summarize"
+                    }
+                ]
+            }
+        ],
+        "SessionStart": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "uv run .claude/hooks/session_start.py"
+                    }
+                ]
+            }
+        ],
+        "SessionEnd": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "uv run .claude/hooks/send_event.py --event-type SessionEnd --add-chat"
+                    }
+                ]
+            }
+        ],
+        "SubagentStop": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "uv run .claude/hooks/subagent_stop.py --add-chat"
+                    }
+                ]
+            }
+        ],
+        "UserPromptSubmit": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "uv run .claude/hooks/user_prompt_submit.py"
+                    }
+                ]
+            }
+        ],
+        "Stop": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "uv run .claude/hooks/stop.py"
+                    }
+                ]
+            }
+        ]
+    },
+    "model": {
+        "default": "claude-sonnet-4-20250514",
+        "tiers": {
+            "BIG": "claude-3-opus-20240229",
+            "MIDDLE": "claude-sonnet-4-20250514",
+            "SMALL": "claude-3-haiku-20240307"
+        }
+    },
+    "context": {
+        "agents_path": "components/agents",
+        "skills_path": "components/skills",
+        "max_agent_tokens": 500,
+        "enable_progressive_disclosure": true
+    },
+    "budgeting": {
+        "daily_limit_usd": 10.00,
+        "hourly_limit_usd": 2.00,
+        "enable_budget_governor": true
+    }
+}

@@ -1,0 +1,26 @@
+{
+  "model": "claude-sonnet-4-5-20250929",
+  "temperature": 0.3,
+  "thinkingBudget": 15000,
+  "systemPrompt": "You are the Performance Optimization Swarm Orchestrator.",
+  "tools": [
+    "Task",
+    "Read",
+    "Write",
+    "Edit",
+    "Bash",
+    "Glob",
+    "Grep",
+    "TodoWrite",
+    "WebSearch",
+    "WebFetch"
+  ],
+  "swarmConfig": {
+    "maxParallelAgents": 3,
+    "enableMemoryBank": true,
+    "memoryPersistence": true,
+    "memoryPath": "memory/memory-bank.json",
+    "benchmarkThreshold": 10,
+    "autoRevert": true
+  }
+}

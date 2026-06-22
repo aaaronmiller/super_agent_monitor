@@ -1,0 +1,11 @@
+characteristics:
+  complexity: complex
+  cost: high
+  speed: thorough
+  use_cases:
+  - architecture design
+  - research synthesis
+  - strategic planning
+model: claude-opus-4-20250514
+thinking_budget: 15000
+type: advanced

@@ -1,0 +1,67 @@
+{
+  "plan_id": "9d031fb0",
+  "goal": "Build a secure API with tests",
+  "tasks": [
+    {
+      "id": "9d031fb0-1",
+      "description": "Analyze requirements for: Build a secure API with tests",
+      "agent_type": "single",
+      "agent": "analyzer",
+      "priority": 1,
+      "dependencies": [],
+      "status": "pending",
+      "result": null
+    },
+    {
+      "id": "9d031fb0-2",
+      "description": "Create implementation plan for: Build a secure API with tests",
+      "agent_type": "single",
+      "agent": "product-manager",
+      "priority": 2,
+      "dependencies": [
+        "9d031fb0-1"
+      ],
+      "status": "pending",
+      "result": null
+    },
+    {
+      "id": "9d031fb0-4",
+      "description": "Test generation for: Build a secure API with tests",
+      "agent_type": "swarm",
+      "agent": "test-swarm",
+      "priority": 3,
+      "dependencies": [
+        "9d031fb0-2"
+      ],
+      "status": "pending",
+      "result": null
+    },
+    {
+      "id": "9d031fb0-5",
+      "description": "API development for: Build a secure API with tests",
+      "agent_type": "swarm",
+      "agent": "api-swarm",
+      "priority": 3,
+      "dependencies": [
+        "9d031fb0-2"
+      ],
+      "status": "pending",
+      "result": null
+    },
+    {
+      "id": "9d031fb0-final",
+      "description": "Final review and decision for: Build a secure API with tests",
+      "agent_type": "council",
+      "agent": "review-council",
+      "priority": 5,
+      "dependencies": [
+        "9d031fb0-4",
+        "9d031fb0-5"
+      ],
+      "status": "pending",
+      "result": null
+    }
+  ],
+  "created_at": "2025-12-11T02:47:39.954209",
+  "status": "pending"
+}

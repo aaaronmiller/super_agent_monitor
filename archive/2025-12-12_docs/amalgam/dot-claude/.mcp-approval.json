@@ -1,0 +1,15 @@
+{
+  "enabledMcpTools": [
+    "exa",
+    "context7",
+    "sentry",
+    "puppeteer",
+    "mcp-redis",
+    "ib-mcp-cache-server",
+    "mem0-memory-mcp",
+    "byterover-mcp",
+    "playwright",
+    "sequentialthinking",
+    "chrome-devtools-mcp-2"
+  ]
+}

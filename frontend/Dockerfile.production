@@ -1,0 +1,81 @@
+# 🔒 Ironclad Frontend - Production Dockerfile
+# SvelteKit + Vite + Shadcn-Svelte
+# Optimized for production with multi-stage build
+
+FROM oven/bun:1.1-alpine AS base
+
+# Install security updates and essential packages
+RUN apk update && apk upgrade --no-cache && \
+    apk add --no-cache \
+    curl \
+    ca-certificates \
+    wget \
+    tini \
+    && rm -rf /var/cache/apk/*
+
+# Create non-root user
+RUN addgroup --gid 1001 --system nodejs \
+    && adduser --system --uid 1001 --ingroup nodejs svelte
+
+WORKDIR /app
+
+# ==================== STAGE 1: DEPENDENCIES ====================
+FROM base AS deps
+
+# Copy package files
+COPY package.json bun.lockb* ./
+
+# Install all dependencies
+RUN bun install --frozen-lockfile
+
+# ==================== STAGE 2: BUILDER ====================
+FROM deps AS builder
+
+# Copy all source code
+COPY . .
+
+# Build the application
+# This generates optimized production build
+RUN bun run build
+
+# ==================== STAGE 3: RUNNER ====================
+FROM base AS runtime
+
+# Copy built application
+COPY --from=builder --chown=svelte:nodejs /app/build ./build
+COPY --from=builder --chown=svelte:nodejs /app/package.json ./
+
+# Copy environment validator script
+COPY --chown=svelte:nodejs env-check.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/env-check.sh
+
+# Install only production dependencies (for SvelteKit preview server)
+RUN bun install --frozen-lockfile --production
+
+# Create log directory
+RUN mkdir -p /app/logs && chown -R svelte:nodejs /app
+
+# Security: Switch to non-root user
+USER svelte
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD wget --quiet --tries=1 --spider http://localhost:4173/ || exit 1
+
+# Expose port (SvelteKit preview)
+EXPOSE 4173
+
+# Use tini for proper signal handling
+ENTRYPOINT ["/sbin/tini", "--"]
+
+# Run SvelteKit preview with optimized settings
+CMD ["bun", "run", "preview", "--host", "0.0.0.0", "--port", "4173"]
+
+# ==================== METADATA ====================
+LABEL com.ironclad.service="frontend" \
+      com.ironclad.version="1.0.0" \
+      com.ironclad.phases="5-6" \
+      com.ironclad.maintainer="ice-ninja" \
+      com.ironclad.created="2025-01-07" \
+      com.ironclad.security="non-root-user" \
+      com.ironclad.runtime="bun"

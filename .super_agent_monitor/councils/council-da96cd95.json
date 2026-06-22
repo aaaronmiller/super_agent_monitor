@@ -1,0 +1,20 @@
+{
+  "council_id": "council-da96cd95",
+  "task": "Test council",
+  "size": 3,
+  "agents": [
+    "agent-1",
+    "agent-2",
+    "agent-3"
+  ],
+  "consensus_threshold": 0.8,
+  "quorum": 2,
+  "rounds": [],
+  "status": "active",
+  "created_at": "2025-12-09T04:59:28.329417",
+  "consecutive_failures": {
+    "agent-1": 0,
+    "agent-2": 0,
+    "agent-3": 0
+  }
+}

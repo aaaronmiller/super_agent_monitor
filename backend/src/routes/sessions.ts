@@ -285,6 +285,60 @@ sessionsRouter.post('/:id/clone', async (req, res) => {
 })
 
 /**
+ * POST /api/sessions/:id/stop
+ * Stop a running session gracefully
+ */
+sessionsRouter.post('/:id/stop', async (req, res) => {
+  try {
+    const { sessionLauncher } = await import('../services/SessionLauncher')
+    await sessionLauncher.stop(req.params.id)
+
+    res.json({
+      success: true,
+      message: 'Session stopped successfully'
+    })
+  } catch (error: any) {
+    res.status(500).json({ error: { code: 'STOP_ERROR', message: error.message } })
+  }
+})
+
+/**
+ * POST /api/sessions/:id/kick
+ * Send SIGINT to a stalled session (like Ctrl+C)
+ */
+sessionsRouter.post('/:id/kick', async (req, res) => {
+  try {
+    const { sessionLauncher } = await import('../services/SessionLauncher')
+    await sessionLauncher.kick(req.params.id)
+
+    res.json({
+      success: true,
+      message: 'Session kicked (SIGINT sent)'
+    })
+  } catch (error: any) {
+    res.status(500).json({ error: { code: 'KICK_ERROR', message: error.message } })
+  }
+})
+
+/**
+ * POST /api/sessions/:id/restart
+ * Stop and restart a session with the same config
+ */
+sessionsRouter.post('/:id/restart', async (req, res) => {
+  try {
+    const { sessionLauncher } = await import('../services/SessionLauncher')
+    const newSessionId = await sessionLauncher.restart(req.params.id)
+
+    res.status(201).json({
+      newSessionId,
+      message: 'Session restarted successfully'
+    })
+  } catch (error: any) {
+    res.status(500).json({ error: { code: 'RESTART_ERROR', message: error.message } })
+  }
+})
+
+/**
  * PATCH /api/sessions/:id
  * Update session status
  * Body: { status: 'active' | 'completed' | 'failed' | 'stalled' }
